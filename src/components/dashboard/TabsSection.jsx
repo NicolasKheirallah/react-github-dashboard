@@ -60,20 +60,16 @@ const TabsSection = ({
           <ul className="flex flex-wrap -mb-px text-sm font-medium" id="tabs">
             {tabs.map(tab => (
               <li className="mr-2" key={tab.id}>
-                <a 
-                  href="#" 
+                <button // Changed from 'a' tag to button
                   className={`inline-block p-4 ${
                     activeTab === tab.id 
                       ? 'tab-active border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500 font-semibold' 
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 border-b-2 border-transparent'
                   }`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onTabChange(tab.id);
-                  }}
+                  onClick={() => onTabChange(tab.id)} // Removed e.preventDefault()
                 >
                   {tab.label} <span className="ml-1 text-xs">{tab.count}</span>
-                </a>
+                </button>
               </li>
             ))}
           </ul>

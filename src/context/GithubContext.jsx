@@ -28,6 +28,8 @@ export function GithubProvider({ children, value }) {
     if (savedTheme === 'light') return false;
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
 
   // Apply dark mode to document
   useEffect(() => {
@@ -62,6 +64,8 @@ export function GithubProvider({ children, value }) {
       timeOfDay: {},
       repoTypeDistribution: {},
     });
+    setFollowers([]);
+    setFollowing([]);
   };
 
   return (
@@ -78,6 +82,8 @@ export function GithubProvider({ children, value }) {
       loading,
       error,
       darkMode,
+      followers,
+      following,
       setUserData,
       setRepositories,
       setPullRequests,
@@ -89,7 +95,9 @@ export function GithubProvider({ children, value }) {
       setLoading,
       setError,
       toggleDarkMode,
-      clearData
+      clearData,
+      setFollowers,
+      setFollowing,
     }}>
       {children}
     </GithubContext.Provider>

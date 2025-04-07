@@ -1,4 +1,3 @@
-
 // GitHub API base URL with https://
 const API_BASE_URL = 'https://api.github.com';
 
@@ -369,12 +368,12 @@ export const fetchCommitActivityStats = async (token, owner, repo) => {
 // Fetch project boards associated with user
 export const fetchProjectBoards = async (token) => {
   const url = `${API_BASE_URL}/user/projects`;
-  const options = {
-    headers: {
-      ...getHeaders(token),
-      'Accept': 'application/vnd.github.inertia-preview+json' // Required for projects API
-    },
-  };
+  // const options = {
+  //   headers: {
+  //     ...getHeaders(token),
+  //     'Accept': 'application/vnd.github.inertia-preview+json' // Required for projects API
+  //   },
+  // };
   
   try {
     return await fetchAllPages(url, token);
@@ -551,5 +550,362 @@ export const fetchDetailedRepoData = async (token, owner, repo) => {
       prReviewComments: [],
       vulnerabilities: null
     };
+  }
+};
+
+// ====== NEW READ FUNCTIONALITY ADDITIONS ======
+
+// Fetch repository languages
+export const fetchRepoLanguages = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/languages`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error(`Error fetching languages for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch repository tags
+export const fetchRepoTags = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/tags`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching tags for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch repository branches
+export const fetchRepoBranches = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/branches`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching branches for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch repository contributors
+export const fetchRepoDetailedContributors = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/contributors`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching detailed contributors for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch repository teams (for organization repos)
+export const fetchRepoTeams = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/teams`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching teams for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch repository contents
+export const fetchRepoContents = async (token, owner, repo, path = '') => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/contents/${path}`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error(`Error fetching contents for ${owner}/${repo}/${path}:`, error);
+    return null;
+  }
+};
+
+// Fetch repository README
+export const fetchRepoReadme = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/readme`;
+  const options = {
+    headers: {
+      ...getHeaders(token),
+      'Accept': 'application/vnd.github.v3.raw+json'
+    },
+  };
+  
+  try {
+    return await fetch(url, options).then(res => res.text());
+  } catch (error) {
+    console.error(`Error fetching README for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch repository license
+export const fetchRepoLicense = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/license`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error(`Error fetching license for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch issue/PR comments
+export const fetchIssueComments = async (token, owner, repo, issueNumber) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/issues/${issueNumber}/comments`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching comments for ${owner}/${repo}#${issueNumber}:`, error);
+    return [];
+  }
+};
+
+export const fetchPRComments = async (token, owner, repo, prNumber) => {
+    const url = `${API_BASE_URL}/repos/${owner}/${repo}/pulls/${prNumber}/comments`;
+    try {
+        return await fetchAllPages(url, token);
+    } catch (error) {
+        console.error(`Error fetching comments for ${owner}/${repo}#${prNumber}:`, error);
+        return [];
+    }
+};
+
+// Fetch issue/PR events
+export const fetchIssueEvents = async (token, owner, repo, issueNumber) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/issues/${issueNumber}/events`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching events for ${owner}/${repo}#${issueNumber}:`, error);
+    return [];
+  }
+};
+
+export const fetchPREvents = async (token, owner, repo, prNumber) => {
+    const url = `${API_BASE_URL}/repos/${owner}/${repo}/pulls/${prNumber}/events`;
+    try {
+        return await fetchAllPages(url, token);
+    } catch (error) {
+        console.error(`Error fetching events for ${owner}/${repo}#${prNumber}:`, error);
+        return [];
+    }
+};
+
+// Fetch user gists
+export const fetchUserGists = async (token, username) => {
+  const url = `${API_BASE_URL}/users/${username}/gists`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching gists for ${username}:`, error);
+    return [];
+  }
+};
+
+// Fetch detailed user organizations
+export const fetchDetailedUserOrgs = async (token, username) => {
+  const url = `${API_BASE_URL}/users/${username}/orgs`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching detailed orgs for ${username}:`, error);
+    return [];
+  }
+};
+
+// Fetch user packages
+export const fetchUserPackages = async (token, username) => {
+  const url = `${API_BASE_URL}/users/${username}/packages`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching packages for ${username}:`, error);
+    return [];
+  }
+};
+
+// Fetch organization members
+export const fetchOrgMembers = async (token, org) => {
+  const url = `${API_BASE_URL}/orgs/${org}/members`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching members for ${org}:`, error);
+    return [];
+  }
+};
+
+// Fetch organization teams
+export const fetchOrgTeams = async (token, org) => {
+  const url = `${API_BASE_URL}/orgs/${org}/teams`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching teams for ${org}:`, error);
+    return [];
+  }
+};
+
+// Fetch organization projects
+export const fetchOrgProjects = async (token, org) => {
+  const url = `${API_BASE_URL}/orgs/${org}/projects`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching projects for ${org}:`, error);
+    return [];
+  }
+};
+
+export const fetchRepoReleases = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/releases`;
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching releases for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch repository traffic views
+export const fetchRepoTrafficViews = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/traffic/views`;
+  const options = {
+    headers: getHeaders(token)
+  };
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching traffic views for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch repository traffic clones
+export const fetchRepoTrafficClones = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/traffic/clones`;
+  const options = {
+    headers: getHeaders(token)
+  };
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching traffic clones for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch GitHub Actions workflows for a repository
+export const fetchRepoWorkflows = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/actions/workflows`;
+  try {
+    return await fetchWithRetry(url, { headers: getHeaders(token) });
+  } catch (error) {
+    console.error(`Error fetching workflows for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch GitHub Actions workflow runs for a repository
+export const fetchWorkflowRuns = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/actions/runs`;
+  try {
+    return await fetchWithRetry(url, { headers: getHeaders(token) });
+  } catch (error) {
+    console.error(`Error fetching workflow runs for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch repository topics
+export const fetchRepoTopics = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/topics`;
+  const options = {
+    headers: {
+      ...getHeaders(token),
+      'Accept': 'application/vnd.github.mercy-preview+json' // Required for topics API
+    }
+  };
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching topics for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+export const fetchGraphQLData = async (token, query, variables = {}) => {
+  const url = 'https://api.github.com/graphql';
+  const options = {
+    method: 'POST',
+    headers: {
+      ...getHeaders(token),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ query, variables })
+  };
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(`GraphQL API error: ${response.status} ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data.data;
+  } catch (error) {
+    console.error('Error fetching GraphQL data:', error);
+    return null;
+  }
+};
+
+// Fetch code scanning alerts for a repository
+export const fetchCodeScanningAlerts = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/code-scanning/alerts`;
+  // const options = {
+  //   headers: getHeaders(token)
+  // };
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching code scanning alerts for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch rate limit status
+export const fetchRateLimit = async (token) => {
+  const url = `${API_BASE_URL}/rate_limit`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error('Error fetching rate limit:', error);
+    return null;
   }
 };
