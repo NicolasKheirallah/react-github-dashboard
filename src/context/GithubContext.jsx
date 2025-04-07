@@ -3,6 +3,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 const GithubContext = createContext();
 
 export function GithubProvider({ children, value }) {
+  const [userEvents, setUserEvents] = useState([]);
   const [userData, setUserData] = useState(null);
   const [repositories, setRepositories] = useState([]);
   const [pullRequests, setPullRequests] = useState([]);
@@ -99,6 +100,7 @@ const toggleDarkMode = () => {
       darkMode,
       followers,
       following,
+      userEvents,
       setUserData,
       setRepositories,
       setPullRequests,
@@ -113,6 +115,7 @@ const toggleDarkMode = () => {
       clearData,
       setFollowers,
       setFollowing,
+      setUserEvents,
     }}>
       {children}
     </GithubContext.Provider>

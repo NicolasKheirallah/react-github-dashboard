@@ -18,6 +18,8 @@ import CodeChurnChart from './dashboard/charts/CodeChurnChart';
 import CommitFrequencyChart from './dashboard/charts/CommitFrequencyChart';
 import PRSizeDistributionChart from './dashboard/charts/PRSizeDistributionChart';
 import IssueTypesChart from './dashboard/charts/IssueTypesChart';
+import ActivityHeatmap from './dashboard/charts/ActivityHeatmap';
+import LanguageChart from './dashboard/charts/LanguageChart';
 
 const Dashboard = () => {
   const { 
@@ -31,6 +33,7 @@ const Dashboard = () => {
     setStarredRepos,
     setContributions,
     setAnalytics,
+    setUserEvents,
     loading,
     setLoading,
     error,
@@ -72,6 +75,7 @@ const Dashboard = () => {
           processedOrgs,
           processedStarred,
           processedContributions,
+          processedEvents,
           analytics
         } = processGithubData(data);
         
@@ -83,6 +87,7 @@ const Dashboard = () => {
         setOrganizations(processedOrgs);
         setStarredRepos(processedStarred);
         setContributions(processedContributions);
+        setUserEvents(processedEvents || data.userEvents); // Make sure userEvents is set
         setAnalytics(analytics);
         setDataLoaded(true);
       } catch (err) {
@@ -95,7 +100,7 @@ const Dashboard = () => {
     
     loadData();
   // Added all the setter dependencies to satisfy ESLint
-  }, [token, setUserData, setPullRequests, setIssues, setRepositories, setOrganizations, setStarredRepos, setContributions, setAnalytics, setError, setLoading]);
+  }, [token, setUserData, setPullRequests, setIssues, setRepositories, setOrganizations, setStarredRepos, setContributions, setUserEvents, setAnalytics, setError, setLoading]);
   
   // Toggle between dashboard types
   const toggleDashboardType = () => {
@@ -200,6 +205,9 @@ const Dashboard = () => {
                 <ContributorsTab searchQuery={searchQuery} sortOption={sortOption === 'newest' ? 'most-active' : sortOption} />
               </div>
             </div>
+            <div className="mb-8">
+              <ActivityHeatmap />
+            </div>
           </>
         );
         
@@ -214,6 +222,24 @@ const Dashboard = () => {
               </div>
               <div className="p-4">
                 <AnalyticsTab />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Pull Request Review Time</h3>
+                </div>
+                <div className="p-4">
+                  <PRReviewTimeChart size="medium" />
+                </div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Issue Resolution</h3>
+                </div>
+                <div className="p-4">
+                  <IssueResolutionChart size="medium" />
+                </div>
               </div>
             </div>
           </>
@@ -250,19 +276,19 @@ const Dashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">PR Size Distribution</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Language Distribution</h3>
                     </div>
                     <div className="p-4">
-                      <PRSizeDistributionChart size="small" />
+                      <LanguageChart size="small" />
                     </div>
                   </div>
                   
                   <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Issue Types</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Pull Request Size Distribution</h3>
                     </div>
                     <div className="p-4">
-                      <IssueTypesChart size="small" />
+                      <PRSizeDistributionChart size="small" />
                     </div>
                   </div>
                 </div>
@@ -285,7 +311,33 @@ const Dashboard = () => {
               sortOption={sortOption}
               onSortChange={handleSort}
             />
-            {/* New section using PRReviewTimeChart and IssueResolutionChart */}
+            
+            {/* Activity Heatmap Section */}
+            <div className="mb-8">
+              <ActivityHeatmap />
+            </div>
+            
+            <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Issue Types</h3>
+                </div>
+                <div className="p-4">
+                  <IssueTypesChart size="medium" />
+                </div>
+              </div>
+              
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Language Distribution</h3>
+                </div>
+                <div className="p-4">
+                  <LanguageChart size="medium" />
+                </div>
+              </div>
+            </div>
+            
+            {/* Review & Resolution Analytics Section */}
             <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
               <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 rounded-t-lg">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Review & Resolution Analytics</h2>
