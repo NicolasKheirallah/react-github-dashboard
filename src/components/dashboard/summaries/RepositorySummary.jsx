@@ -1,4 +1,3 @@
-// src/components/dashboard/summaries/RepositorySummary.jsx
 import React from 'react';
 import { useGithub } from '../../../context/GithubContext';
 
@@ -20,15 +19,11 @@ const RepositorySummary = ({ size }) => {
   const publicRepos = repositories.filter(repo => !repo.isPrivate).length;
   const privateRepos = repositories.filter(repo => repo.isPrivate).length;
   
-  // Find most starred repo
   const mostStarredRepo = [...repositories].sort((a, b) => b.stars - a.stars)[0];
-  
-  // Find most recently updated repo
   const mostRecentRepo = [...repositories].sort((a, b) => 
     new Date(b.updated) - new Date(a.updated)
   )[0];
   
-  // Get top languages
   const languageCounts = {};
   repositories.forEach(repo => {
     if (repo.language) {
@@ -53,6 +48,13 @@ const RepositorySummary = ({ size }) => {
           <div className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
             {originalRepos}/{forkedRepos}
           </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 mb-4">
+        <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Public / Private</div>
+        <div className="text-lg font-semibold text-gray-900 dark:text-white">
+          {publicRepos} / {privateRepos}
         </div>
       </div>
       

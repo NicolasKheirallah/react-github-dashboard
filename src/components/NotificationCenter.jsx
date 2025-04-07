@@ -3,7 +3,7 @@ import { useGithub } from '../context/GithubContext';
 import { fetchNotifications, markNotificationAsRead } from '../services/githubService';
 
 const NotificationCenter = () => {
-  const { token, darkMode } = useGithub();
+  const { token } = useGithub();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

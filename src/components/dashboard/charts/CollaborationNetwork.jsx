@@ -1,9 +1,8 @@
-// src/components/dashboard/charts/CollaborationNetwork.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { useGithub } from '../../../context/GithubContext';
 import ForceGraph2D from 'react-force-graph-2d';
 
-const CollaborationNetwork = () => {
+const CollaborationNetwork = ({ size = 'medium', config = {} }) => {
   const { pullRequests, issues, userData } = useGithub();
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [highlightNodes, setHighlightNodes] = useState(new Set());
@@ -20,9 +19,10 @@ const CollaborationNetwork = () => {
       
       // First, extract all unique collaborators and repos
       allItems.forEach(item => {
-        const repoName = item.repository;
+        const repoName = item.repository?.name || "unknown-repo";
         if (!repoMap[repoName]) {
           repoMap[repoName] = {
+            id: `repo-${repoName}`, // Ensure unique ID
             name: repoName,
             type: 'repo',
             count: 0
@@ -34,6 +34,7 @@ const CollaborationNetwork = () => {
       // Current user is the central node
       const username = userData?.login || 'you';
       collaboratorMap[username] = {
+        id: `user-${username}`, // Ensure unique ID
         name: username,
         type: 'user',
         count: allItems.length,
@@ -48,8 +49,8 @@ const CollaborationNetwork = () => {
       
       // Build links array - connect user to repos
       const links = Object.values(repoMap).map(repo => ({
-        source: username,
-        target: repo.name,
+        source: collaboratorMap[username].id,
+        target: repo.id,
         value: repo.count
       }));
       
@@ -74,7 +75,7 @@ const CollaborationNetwork = () => {
     connectedNodes.add(node);
     
     graphData.links.forEach(link => {
-      if (link.source.name === node.name || link.target.name === node.name) {
+      if (link.source.id === node.id || link.target.id === node.id) {
         connectedLinks.add(link);
         connectedNodes.add(link.source);
         connectedNodes.add(link.target);
@@ -99,10 +100,25 @@ const CollaborationNetwork = () => {
     if (node.type === 'repo') return '#10b981'; // Green for repos
     return '#3b82f6'; // Blue for other users
   };
+
+  // Error handling function for node lookup
+  const nodeExists = (nodeId) => {
+    return graphData.nodes.some(node => node.id === nodeId);
+  };
+  
+  // Get height based on size prop
+  const getHeight = () => {
+    switch (size) {
+      case 'small': return '250px';
+      case 'large': return '500px';
+      case 'medium':
+      default: return '400px';
+    }
+  };
   
   return (
     <div className="w-full h-full">
-      <div className="h-[400px] rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <div className={`rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800`} style={{ height: getHeight() }}>
         {graphData.nodes.length > 0 ? (
           <>
             <ForceGraph2D
@@ -149,6 +165,13 @@ const CollaborationNetwork = () => {
                 if (centerNode) {
                   centerNode.fx = 0;
                   centerNode.fy = 0;
+                }
+              }}
+              onLinkClick={(link) => {
+                // Validate source and target before handling clicks
+                if (!nodeExists(link.source.id) || !nodeExists(link.target.id)) {
+                  console.warn("Link references a non-existent node");
+                  return;
                 }
               }}
             />

@@ -39,12 +39,25 @@ const CommandPalette = () => {
     action: () => window.open(pr.url, '_blank')
   })) || [];
   
+  const issueCommands = issues?.slice(0, 3).map(issue => ({
+    id: `issue-${issue.number}`,
+    name: `Open Issue: #${issue.number}`,
+    description: issue.title,
+    action: () => window.open(issue.url, '_blank')
+  })) || [];
+  
   // Filter commands based on search query
-  const filteredCommands = [...commands, ...repoCommands, ...prCommands].filter(command => 
+  const filteredCommands = [
+    ...commands,
+    ...repoCommands,
+    ...prCommands,
+    ...issueCommands
+  ].filter(command => 
     command.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (command.description && command.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (command.shortcut && command.shortcut.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+  
   
   // Handle key press
   useEffect(() => {

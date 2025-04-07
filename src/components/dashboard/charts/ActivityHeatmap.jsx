@@ -23,15 +23,12 @@ const ActivityHeatmap = () => {
       startDate.setFullYear(startDate.getFullYear() - 1);
 
       // Initialize all dates in range with 0 count
-      const dateRange = [];
       const currentDate = new Date(startDate);
       while (currentDate <= endDate) {
         const dateStr = currentDate.toISOString().split('T')[0];
         contributions[dateStr] = 0;
-
         currentDate.setDate(currentDate.getDate() + 1);
       }
-
       // Count contributions by date
       userEvents.forEach((event) => {
         const date = new Date(event.created_at);

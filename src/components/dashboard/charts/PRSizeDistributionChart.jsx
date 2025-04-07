@@ -7,14 +7,6 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
-  // Define PR size thresholds (lines changed)
-  const PR_SIZE_THRESHOLDS = {
-    'XS': 10,    // 0-10 lines
-    'S': 50,     // 11-50 lines
-    'M': 250,    // 51-250 lines
-    'L': 1000,   // 251-1000 lines
-    'XL': Infinity // 1000+ lines
-  };
 
   useEffect(() => {
     if (!pullRequests || pullRequests.length === 0 || !chartRef.current) {
@@ -25,7 +17,14 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
     if (chartInstance.current) {
       chartInstance.current.destroy();
     }
-
+    const PR_SIZE_THRESHOLDS = {
+      'XS': 10,    // 0-10 lines
+      'S': 50,     // 11-50 lines
+      'M': 250,    // 51-250 lines
+      'L': 1000,   // 251-1000 lines
+      'XL': Infinity // 1000+ lines
+    };
+  
     // Process pull requests to categorize by size
     const prSizes = {
       'XS': 0,
@@ -69,7 +68,6 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
     // Chart theme
     const isDarkMode = darkMode;
     const textColor = isDarkMode ? '#c9d1d9' : '#24292f';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
 
     // Create the chart
     const ctx = chartRef.current.getContext('2d');

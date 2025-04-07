@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useGithub } from '../../../context/GithubContext';
 import Chart from 'chart.js/auto';
 
-const IssueResolutionChart = ({ size = 'medium' }) => {
+const IssueResolutionChart = ({ size = 'medium', config = {} }) => {
     const { issues, darkMode } = useGithub();
     const chartRef = useRef(null);
     const chartInstance = useRef(null);
@@ -185,13 +185,12 @@ const IssueResolutionChart = ({ size = 'medium' }) => {
         if (!issues || issues.length === 0) return [{ value: 'all', label: 'All Issues' }];
 
         // Get unique repositories
-        const repositories = [...new Set(issues.map(issue => issue.repository.name))];
+        const repositories = [...new Set(issues.map(issue => issue.repository?.name).filter(Boolean))];
 
         // Get unique labels
         const allLabels = issues
             .flatMap(issue => Array.isArray(issue.labels) ? issue.labels.map(label => label.name) : [])
             .filter((value, index, self) => self.indexOf(value) === index);
-
 
         return [
             { value: 'all', label: 'All Issues' },
@@ -223,7 +222,6 @@ const IssueResolutionChart = ({ size = 'medium' }) => {
                         </option>
                     ))}
                 </select>
-
             </div>
             <div className={`w-full ${getChartHeight()}`}>
                 {issues && issues.length > 0 ? (

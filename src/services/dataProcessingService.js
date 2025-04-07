@@ -1,222 +1,84 @@
-// src/services/dataProcessingService.js
-import _ from 'lodash';
+import { getLastNMonths, getDaysBetween } from '../utils/dateUtils';
+import { getLanguageColors } from '../utils/colorUtils';
 
-// Generate consistent colors for programming languages
-const getLanguageColors = (languages) => {
-  // Common language colors (GitHub-like)
-  const commonLanguageColors = {
-    JavaScript: "#f1e05a",
-    TypeScript: "#2b7489",
-    Python: "#3572A5",
-    Java: "#b07219",
-    "C#": "#178600",
-    PHP: "#4F5D95",
-    "C++": "#f34b7d",
-    C: "#555555",
-    Shell: "#89e051",
-    Ruby: "#701516",
-    Go: "#00ADD8",
-    Swift: "#ffac45",
-    Kotlin: "#F18E33",
-    Rust: "#dea584",
-    Dart: "#00B4AB",
-    HTML: "#e34c26",
-    CSS: "#563d7c",
-    "Jupyter Notebook": "#DA5B0B",
-    Vue: "#2c3e50",
-    R: "#198CE7",
-    Other: "#8b8b8b",
-  };
+const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
+const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long' });
 
-  const languageColors = {};
-
-  for (const lang of languages) {
-    if (lang in commonLanguageColors) {
-      languageColors[lang] = commonLanguageColors[lang];
-    } else {
-      // Generate color based on language name hash for consistency
-      let hash = 0;
-      for (let i = 0; i < lang.length; i++) {
-        hash = lang.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      
-      // Generate RGB values
-      const r = (hash & 0xFF) % 200 + 55;  // Avoid too dark/light
-      const g = ((hash >> 8) & 0xFF) % 200 + 55;
-      const b = ((hash >> 16) & 0xFF) % 200 + 55;
-      
-      languageColors[lang] = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-    }
-  }
-
-  return languageColors;
+const safeGetLabels = (labels) => {
+  return Array.isArray(labels) ? labels.map(label => label.name).join(', ') : '';
 };
 
-/**
- * Process raw GitHub API data into formatted data for charts and display
- */
-export const processGithubData = (rawData) => {
-  const { 
-    userProfile, 
-    pullRequests, 
-    issuesCreated, 
-    repositories, 
-    organizations, 
-    starredRepos,
-    userEvents 
-  } = rawData;
-  
-  // Process pull requests
-  const processedPRs = processPullRequests(pullRequests);
-  
-  // Process issues (excluding PRs)
-  const processedIssues = processIssues(issuesCreated);
-  
-  // Process repositories
-  const processedRepos = processRepositories(repositories);
-  
-  // Process organizations
-  const processedOrgs = processOrganizations(organizations);
-  
-  // Process starred repositories
-  const processedStarred = processStarredRepos(starredRepos);
-  
-  // Process user events for contributions
-  const processedContributions = processContributions(userEvents);
-  
-  // Generate analytics data
-  const analytics = generateAnalytics({
-    prs: processedPRs,
-    issues: processedIssues,
-    repos: processedRepos,
-    contributions: processedContributions
-  });
-  
-  return {
-    userData: userProfile,
-    processedPRs,
-    processedIssues,
-    processedRepos,
-    processedOrgs,
-    processedStarred,
-    processedContributions,
-    analytics
-  };
-};
-
-/**
- * Process pull requests into formatted data
- */
-const processPullRequests = (pullRequests) => {
+export const processPullRequests = (pullRequests) => {
   return pullRequests.map(pr => {
     try {
-      // Extract repository name from URL
-      const repoUrl = pr.repository_url || '';
-      const repoName = repoUrl.replace('https://api.github.com/repos/', '');
-
-      // Calculate days open
+      const repoName = (pr.repository_url || '').replace('https://api.github.com/repos/', '');
       const createdDate = new Date(pr.created_at);
-      let closedDate = null;
-      let daysOpen = 0;
-      
-      if (pr.closed_at) {
-        closedDate = new Date(pr.closed_at);
-        daysOpen = ((closedDate - createdDate) / (1000 * 60 * 60 * 24)).toFixed(1);
-      } else {
-        daysOpen = ((new Date() - createdDate) / (1000 * 60 * 60 * 24)).toFixed(1);
-      }
-
-      // Determine merge status
-      let mergeStatus = 'Open';
-      if (pr.pull_request?.merged_at) {
-        mergeStatus = 'Merged';
-      } else if (pr.state === 'closed') {
-        mergeStatus = 'Closed';
-      }
-
-      // Extract labels
-      const labels = pr.labels.map(label => label.name).join(', ');
+      const closedDate = pr.closed_at ? new Date(pr.closed_at) : null;
+      const daysOpen = getDaysBetween(createdDate, closedDate || new Date());
+      const state = pr.pull_request?.merged_at ? 'Merged' : pr.state === 'closed' ? 'Closed' : 'Open';
 
       return {
         number: pr.number,
         repository: repoName,
         title: pr.title,
-        state: mergeStatus,
+        state,
         daysOpen: parseFloat(daysOpen),
         created: createdDate.toISOString().split('T')[0],
         createdDateTime: createdDate,
         hourCreated: createdDate.getHours(),
         updated: new Date(pr.updated_at).toISOString().split('T')[0],
         closedDateTime: closedDate,
-        labels,
+        labels: safeGetLabels(pr.labels),
         comments: pr.comments,
         url: pr.html_url,
-        dayOfWeek: new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(createdDate),
-        month: new Intl.DateTimeFormat('en-US', { month: 'long' }).format(createdDate),
+        dayOfWeek: weekdayFormatter.format(createdDate),
+        month: monthFormatter.format(createdDate),
         year: createdDate.getFullYear().toString()
       };
     } catch (error) {
       console.error(`Error processing PR #${pr.number}:`, error);
       return null;
     }
-  }).filter(Boolean); // Remove any nulls from errors
+  }).filter(Boolean);
 };
 
-/**
- * Process issues into formatted data (excluding PRs)
- */
-const processIssues = (issues) => {
-  return issues.filter(issue => !issue.pull_request).map(issue => {
-    try {
-      // Extract repository name from URL
-      const repoUrl = issue.repository_url || '';
-      const repoName = repoUrl.replace('https://api.github.com/repos/', '');
+export const processIssues = (issues) => {
+  return issues
+    .filter(issue => !issue.pull_request)
+    .map(issue => {
+      try {
+        const repoName = (issue.repository_url || '').replace('https://api.github.com/repos/', '');
+        const createdDate = new Date(issue.created_at);
+        const closedDate = issue.closed_at ? new Date(issue.closed_at) : null;
+        const daysOpen = getDaysBetween(createdDate, closedDate || new Date());
 
-      // Calculate days open
-      const createdDate = new Date(issue.created_at);
-      let closedDate = null;
-      let daysOpen = 0;
-      
-      if (issue.closed_at) {
-        closedDate = new Date(issue.closed_at);
-        daysOpen = ((closedDate - createdDate) / (1000 * 60 * 60 * 24)).toFixed(1);
-      } else {
-        daysOpen = ((new Date() - createdDate) / (1000 * 60 * 60 * 24)).toFixed(1);
+        return {
+          number: issue.number,
+          repository: repoName,
+          title: issue.title,
+          state: issue.state,
+          daysOpen: parseFloat(daysOpen),
+          created: createdDate.toISOString().split('T')[0],
+          createdDateTime: createdDate,
+          hourCreated: createdDate.getHours(),
+          updated: new Date(issue.updated_at).toISOString().split('T')[0],
+          closedDateTime: closedDate,
+          labels: safeGetLabels(issue.labels),
+          comments: issue.comments,
+          url: issue.html_url,
+          dayOfWeek: weekdayFormatter.format(createdDate),
+          month: monthFormatter.format(createdDate),
+          year: createdDate.getFullYear().toString()
+        };
+      } catch (error) {
+        console.error(`Error processing issue #${issue.number}:`, error);
+        return null;
       }
-
-      // Extract labels
-      const labels = issue.labels.map(label => label.name).join(', ');
-
-      return {
-        number: issue.number,
-        repository: repoName,
-        title: issue.title,
-        state: issue.state,
-        daysOpen: parseFloat(daysOpen),
-        created: createdDate.toISOString().split('T')[0],
-        createdDateTime: createdDate,
-        hourCreated: createdDate.getHours(),
-        updated: new Date(issue.updated_at).toISOString().split('T')[0],
-        closedDateTime: closedDate,
-        labels,
-        comments: issue.comments,
-        url: issue.html_url,
-        dayOfWeek: new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(createdDate),
-        month: new Intl.DateTimeFormat('en-US', { month: 'long' }).format(createdDate),
-        year: createdDate.getFullYear().toString()
-      };
-    } catch (error) {
-      console.error(`Error processing issue #${issue.number}:`, error);
-      return null;
-    }
-  }).filter(Boolean); // Remove any nulls from errors
+    }).filter(Boolean);
 };
 
-/**
- * Process repositories into formatted data
- */
-const processRepositories = (repositories) => {
-  return repositories.map(repo => {
+export const processRepositories = (repos) => {
+  return repos.map(repo => {
     try {
       return {
         name: repo.full_name,
@@ -238,14 +100,11 @@ const processRepositories = (repositories) => {
       console.error(`Error processing repo ${repo.full_name}:`, error);
       return null;
     }
-  }).filter(Boolean); // Remove any nulls from errors
+  }).filter(Boolean);
 };
 
-/**
- * Process organizations into formatted data
- */
-const processOrganizations = (organizations) => {
-  return organizations.map(org => {
+export const processOrganizations = (orgs) => {
+  return orgs.map(org => {
     try {
       return {
         login: org.login,
@@ -258,14 +117,11 @@ const processOrganizations = (organizations) => {
       console.error(`Error processing organization ${org.login}:`, error);
       return null;
     }
-  }).filter(Boolean); // Remove any nulls from errors
+  }).filter(Boolean);
 };
 
-/**
- * Process starred repositories into formatted data
- */
-const processStarredRepos = (starredRepos) => {
-  return starredRepos.map(repo => {
+export const processStarredRepos = (repos) => {
+  return repos.map(repo => {
     try {
       return {
         name: repo.full_name,
@@ -279,14 +135,10 @@ const processStarredRepos = (starredRepos) => {
       console.error(`Error processing starred repo ${repo.full_name}:`, error);
       return null;
     }
-  }).filter(Boolean); // Remove any nulls from errors
+  }).filter(Boolean);
 };
 
-/**
- * Process user events into contribution data
- */
-const processContributions = (events) => {
-  // Map event types to more readable descriptions
+export const processContributions = (events) => {
   const eventTypes = {
     PushEvent: 'Code Push',
     PullRequestEvent: 'Pull Request',
@@ -305,34 +157,22 @@ const processContributions = (events) => {
     MemberEvent: 'Member Added'
   };
 
-  // Initialize counters
   const eventCounts = {};
   const monthlyCommits = {};
   const repoActivity = {};
 
   events.forEach(event => {
     try {
-      const eventType = event.type || 'Unknown';
-      const createdAt = event.created_at || '';
-      const repoName = event.repo?.name || '';
+      const type = eventTypes[event.type] || event.type;
+      const repo = event.repo?.name || '';
+      const createdAt = event.created_at;
+      eventCounts[type] = (eventCounts[type] || 0) + 1;
+      if (repo) repoActivity[repo] = (repoActivity[repo] || 0) + 1;
 
-      // Count event types
-      const readableType = eventTypes[eventType] || eventType;
-      eventCounts[readableType] = (eventCounts[readableType] || 0) + 1;
-
-      // Count repository activity
-      if (repoName) {
-        repoActivity[repoName] = (repoActivity[repoName] || 0) + 1;
-      }
-
-      // Count monthly commits for PushEvents
-      if (eventType === 'PushEvent' && createdAt) {
-        const date = new Date(createdAt);
-        const monthYear = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
-        // Get commit count from the payload
-        const commitCount = event.payload?.commits?.length || 0;
-        monthlyCommits[monthYear] = (monthlyCommits[monthYear] || 0) + commitCount;
+      if (event.type === 'PushEvent' && createdAt) {
+        const monthYear = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+        const commits = event.payload?.commits?.length || 0;
+        monthlyCommits[monthYear] = (monthlyCommits[monthYear] || 0) + commits;
       }
     } catch (error) {
       console.error('Error processing event:', error);
@@ -346,14 +186,11 @@ const processContributions = (events) => {
   };
 };
 
-/**
- * Generate analytics data from processed GitHub data
- */
-const generateAnalytics = ({ prs, issues, repos, contributions }) => {
+export const generateAnalytics = ({ prs, issues, repos, contributions }) => {
   return {
     languageStats: processLanguageStats(repos),
-    prTimeline: processPRTimeline(prs),
-    issueTimeline: processIssueTimeline(issues),
+    prTimeline: processTimeline(prs),
+    issueTimeline: processTimeline(issues),
     dayOfWeekActivity: processDayOfWeekActivity(prs, issues),
     prStateDistribution: processPRStateStats(prs),
     timeOfDay: processTimeOfDayActivity(prs, issues),
@@ -363,307 +200,155 @@ const generateAnalytics = ({ prs, issues, repos, contributions }) => {
   };
 };
 
-/**
- * Process language statistics for visualization
- */
-const processLanguageStats = (repos) => {
-  const languageStats = {};
-
-  // Count languages across repositories weighted by stars
-  repos.forEach(repo => {
-    if (repo.language && !repo.isFork) {
-      const lang = repo.language;
-      // Weight by stars
-      const weight = 1 + (0.1 * repo.stars);
-      languageStats[lang] = (languageStats[lang] || 0) + weight;
-    }
+const processTimeline = (items) => {
+  const months = getLastNMonths(12);
+  const timeline = Object.fromEntries(months.map(month => [month, 0]));
+  items.forEach(item => {
+    const key = new Date(item.createdDateTime).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    if (timeline[key] !== undefined) timeline[key]++;
   });
-
-  // Filter out languages with very small values and sort by value
-  const threshold = 0.5;
-  const filteredStats = Object.fromEntries(
-    Object.entries(languageStats).filter(([, value]) => value >= threshold)
-  );
-  
-  const sortedStats = Object.fromEntries(
-    Object.entries(filteredStats).sort((a, b) => b[1] - a[1])
-  );
-
-  // Take top 10 languages
-  const topLanguages = Object.fromEntries(
-    Object.entries(sortedStats).slice(0, 10)
-  );
-
-  // Others category for the rest
-  const otherLanguages = Object.entries(filteredStats)
-    .filter(([key]) => !Object.keys(topLanguages).includes(key))
-    .reduce((sum, [, value]) => sum + value, 0);
-
-  if (otherLanguages > 0) {
-    topLanguages['Other'] = otherLanguages;
-  }
-
-  // Generate colors for each language
-  const languageColors = getLanguageColors(Object.keys(topLanguages));
-
-  return {
-    labels: Object.keys(topLanguages),
-    data: Object.values(topLanguages),
-    colors: Object.keys(topLanguages).map(lang => languageColors[lang])
-  };
+  return { labels: months, data: months.map(m => timeline[m]) };
 };
 
-/**
- * Process PR timeline data for visualization
- */
-const processPRTimeline = (prs) => {
-  // Group PRs by month-year
-  const timelineData = {};
-
-  // Create a 12-month timeline
-  const now = new Date();
-  const months = [];
-  
-  for (let i = 0; i < 12; i++) {
-    const date = new Date(now);
-    date.setMonth(now.getMonth() - i);
-    const monthYear = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    timelineData[monthYear] = 0;
-    months.unshift(monthYear); // Add to beginning for chronological order
-  }
-
-  // Fill in actual PR counts
-  prs.forEach(pr => {
-    const monthYear = new Date(pr.createdDateTime).toLocaleDateString('en-US', { 
-      month: 'short', 
-      year: 'numeric' 
-    });
-    
-    if (monthYear in timelineData) {
-      timelineData[monthYear]++;
-    }
-  });
-
-  return {
-    labels: months,
-    data: months.map(month => timelineData[month])
-  };
-};
-
-/**
- * Process issue timeline data for visualization
- */
-const processIssueTimeline = (issues) => {
-  // Get the same months as PR timeline for consistency
-  const prTimeline = processPRTimeline(issues);
-  const months = prTimeline.labels;
-  
-  // Group issues by month-year
-  const timelineData = {};
-  
-  months.forEach(month => {
-    timelineData[month] = 0;
-  });
-
-  // Fill in actual issue counts
-  issues.forEach(issue => {
-    const monthYear = new Date(issue.createdDateTime).toLocaleDateString('en-US', { 
-      month: 'short', 
-      year: 'numeric' 
-    });
-    
-    if (monthYear in timelineData) {
-      timelineData[monthYear]++;
-    }
-  });
-
-  return {
-    labels: months,
-    data: months.map(month => timelineData[month])
-  };
-};
-
-/**
- * Process activity by day of week
- */
 const processDayOfWeekActivity = (prs, issues) => {
-  // Initialize counts for each day of week in correct order (Monday to Sunday)
-  const daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-  ];
-  
-  const prCounts = daysOfWeek.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
-  const issueCounts = daysOfWeek.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const prCounts = Object.fromEntries(days.map(day => [day, 0]));
+  const issueCounts = Object.fromEntries(days.map(day => [day, 0]));
 
-  // Count PRs by day of week
-  prs.forEach(pr => {
-    const day = pr.dayOfWeek;
-    prCounts[day]++;
-  });
-
-  // Count issues by day of week
-  issues.forEach(issue => {
-    const day = issue.dayOfWeek;
-    issueCounts[day]++;
-  });
+  prs.forEach(pr => prCounts[pr.dayOfWeek]++);
+  issues.forEach(issue => issueCounts[issue.dayOfWeek]++);
 
   return {
-    labels: daysOfWeek,
-    prData: daysOfWeek.map(day => prCounts[day]),
-    issueData: daysOfWeek.map(day => issueCounts[day])
+    labels: days,
+    prData: days.map(day => prCounts[day]),
+    issueData: days.map(day => issueCounts[day])
   };
 };
 
-/**
- * Process PR state distribution
- */
 const processPRStateStats = (prs) => {
-  const stateCounts = { 'Open': 0, 'Closed': 0, 'Merged': 0 };
-
+  const states = { Open: 0, Closed: 0, Merged: 0 };
   prs.forEach(pr => {
-    if (pr.state in stateCounts) {
-      stateCounts[pr.state]++;
-    }
+    if (states[pr.state] !== undefined) states[pr.state]++;
   });
-
   return {
-    labels: Object.keys(stateCounts),
-    data: Object.values(stateCounts),
-    colors: ['#10b981', '#ef4444', '#8b5cf6'] // Green, Red, Purple
+    labels: Object.keys(states),
+    data: Object.values(states),
+    colors: ['#10b981', '#ef4444', '#8b5cf6']
   };
 };
 
-/**
- * Process activity by time of day
- */
 const processTimeOfDayActivity = (prs, issues) => {
-  // Initialize hourly bins
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const prCounts = Array(24).fill(0);
   const issueCounts = Array(24).fill(0);
-
-  // Count PRs by hour
-  prs.forEach(pr => {
-    const hour = pr.hourCreated;
-    prCounts[hour]++;
-  });
-
-  // Count issues by hour
-  issues.forEach(issue => {
-    const hour = issue.hourCreated;
-    issueCounts[hour]++;
-  });
-
-  // Format hour labels
-  const hourLabels = hours.map(h => `${h}:00`);
-
+  prs.forEach(pr => prCounts[pr.hourCreated]++);
+  issues.forEach(issue => issueCounts[issue.hourCreated]++);
   return {
-    labels: hourLabels,
+    labels: hours.map(h => `${h}:00`),
     prData: prCounts,
     issueData: issueCounts
   };
 };
 
-/**
- * Process repository type distribution
- */
 const processRepoTypeStats = (repos) => {
-  // Count repository types
-  const repoTypes = { 'Public': 0, 'Private': 0, 'Forked': 0, 'Original': 0 };
-
+  const counts = { Public: 0, Private: 0, Forked: 0, Original: 0 };
   repos.forEach(repo => {
-    if (repo.isPrivate) {
-      repoTypes['Private']++;
-    } else {
-      repoTypes['Public']++;
-    }
-
-    if (repo.isFork) {
-      repoTypes['Forked']++;
-    } else {
-      repoTypes['Original']++;
-    }
+    counts[repo.isPrivate ? 'Private' : 'Public']++;
+    counts[repo.isFork ? 'Forked' : 'Original']++;
   });
-
-  // Store results as two separate datasets
   return {
     visibility: {
       labels: ['Public', 'Private'],
-      data: [repoTypes['Public'], repoTypes['Private']],
-      colors: ['#22c55e', '#6366f1'] // Green, Indigo
+      data: [counts.Public, counts.Private],
+      colors: ['#22c55e', '#6366f1']
     },
     origin: {
       labels: ['Original', 'Forked'],
-      data: [repoTypes['Original'], repoTypes['Forked']],
-      colors: ['#3b82f6', '#a855f7'] // Blue, Purple
+      data: [counts.Original, counts.Forked],
+      colors: ['#3b82f6', '#a855f7']
     }
   };
 };
 
-/**
- * Process monthly commit data from contributions
- */
 const processMonthlyCommits = (contributions) => {
-  // Get the monthly commits data
-  const monthlyCommits = contributions.monthlyCommits || {};
-  
-  // Create a 12-month timeline (reuse same logic as PR timeline for consistency)
-  const now = new Date();
-  const months = [];
-  
-  for (let i = 0; i < 12; i++) {
-    const date = new Date(now);
-    date.setMonth(now.getMonth() - i);
-    months.unshift(date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
-  }
-  
-  // Map the data to the timeline
-  const data = months.map(month => monthlyCommits[month] || 0);
+  const months = getLastNMonths(12);
+  const commits = months.map(month => contributions.monthlyCommits[month] || 0);
+  return { labels: months, data: commits };
+};
 
+const processLanguageStats = (repos) => {
+  const stats = {};
+  repos.forEach(repo => {
+    if (repo.language && !repo.isFork) {
+      const weight = 1 + Math.log2(repo.stars + 1);
+      stats[repo.language] = (stats[repo.language] || 0) + weight;
+    }
+  });
+
+  const entries = Object.entries(stats).filter(([, v]) => v >= 0.5);
+  const sorted = entries.sort((a, b) => b[1] - a[1]);
+  const top = sorted.slice(0, 10);
+  const topLangs = Object.fromEntries(top);
+  const otherSum = sorted.slice(10).reduce((sum, [, v]) => sum + v, 0);
+  if (otherSum > 0) topLangs.Other = otherSum;
+
+  const colors = getLanguageColors(Object.keys(topLangs));
   return {
-    labels: months,
-    data
+    labels: Object.keys(topLangs),
+    data: Object.values(topLangs),
+    colors: Object.keys(topLangs).map(lang => colors[lang])
   };
 };
 
-/**
- * Process repository topics for visualization
- */
 const processRepositoryTopics = (repos) => {
-  // Count topics across all repositories
   const topicCounts = {};
-
   repos.forEach(repo => {
     repo.topics.forEach(topic => {
       topicCounts[topic] = (topicCounts[topic] || 0) + 1;
     });
   });
 
-  // Get top 20 topics
-  const sortedTopics = Object.entries(topicCounts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 20);
+  const sorted = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  const colors = getLanguageColors(sorted.map(([t]) => t));
+  return {
+    labels: sorted.map(([t]) => t),
+    data: sorted.map(([, v]) => v),
+    colors: sorted.map(([t]) => colors[t])
+  };
+};
 
-  // Generate colors for topics
-  const topicColors = {};
-  sortedTopics.forEach(([topic]) => {
-    // Generate color based on topic name hash for consistency
-    let hash = 0;
-    for (let i = 0; i < topic.length; i++) {
-      hash = topic.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    // Generate RGB values
-    const r = (hash & 0xFF) % 200 + 55;
-    const g = ((hash >> 8) & 0xFF) % 200 + 55;
-    const b = ((hash >> 16) & 0xFF) % 200 + 55;
-    
-    topicColors[topic] = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+export const processGithubData = (rawData) => {
+  const {
+    userProfile,
+    pullRequests,
+    issuesCreated,
+    repositories,
+    organizations,
+    starredRepos,
+    userEvents
+  } = rawData;
+
+  const processedPRs = processPullRequests(pullRequests);
+  const processedIssues = processIssues(issuesCreated);
+  const processedRepos = processRepositories(repositories);
+  const processedOrgs = processOrganizations(organizations);
+  const processedStarred = processStarredRepos(starredRepos);
+  const processedContributions = processContributions(userEvents);
+  const analytics = generateAnalytics({
+    prs: processedPRs,
+    issues: processedIssues,
+    repos: processedRepos,
+    contributions: processedContributions
   });
 
   return {
-    labels: sortedTopics.map(([topic]) => topic),
-    data: sortedTopics.map(([, count]) => count),
-    colors: sortedTopics.map(([topic]) => topicColors[topic])
+    userData: userProfile,
+    processedPRs,
+    processedIssues,
+    processedRepos,
+    processedOrgs,
+    processedStarred,
+    processedContributions,
+    analytics
   };
 };

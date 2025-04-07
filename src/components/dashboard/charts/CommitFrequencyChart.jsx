@@ -1,45 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useGithub } from '../../../context/GithubContext';
 
-const CommitFrequencyChart = ({ size = 'medium' }) => {
+const CommitFrequencyChart = ({ size = 'medium', config = {} }) => {
   const { contributions, repositories, darkMode } = useGithub();
   const containerRef = useRef(null);
   const [selectedRepo, setSelectedRepo] = useState('all');
   const [yearOffset, setYearOffset] = useState(0);
   
   // Calculate size based on prop
-  const getSize = () => {
-    switch (size) {
-      case 'small': return { cellSize: 10, margin: 2 };
-      case 'large': return { cellSize: 16, margin: 4 };
-      case 'medium':
-      default: return { cellSize: 12, margin: 3 };
-    }
-  };
 
-  useEffect(() => {
-    if (!contributions || !contributions.commits || contributions.commits.length === 0) {
-      return;
-    }
-
-    // Get all commits
-    let commits = contributions.commits;
-    
-    // Filter by repository if selected
-    if (selectedRepo !== 'all') {
-      commits = commits.filter(commit => 
-        commit.repository && commit.repository.name === selectedRepo
-      );
-    }
-
-    renderHeatmap(commits);
-  }, [contributions, darkMode, selectedRepo, yearOffset]);
-
-  const renderHeatmap = (commits) => {
+  
+  const renderHeatmap = useCallback((commits) => {
     if (!containerRef.current) return;
-    
-    // Clear previous content
     containerRef.current.innerHTML = '';
+  
     
     // Create data structure for heatmap
     const commitsByDate = {};
@@ -65,7 +39,14 @@ const CommitFrequencyChart = ({ size = 'medium' }) => {
     
     // Calculate maximum commits in a day (for color intensity)
     const maxCommits = Math.max(1, ...Object.values(commitsByDate));
-    
+    const getSize = () => {
+      switch (size) {
+        case 'small': return { cellSize: 10, margin: 2 };
+        case 'large': return { cellSize: 16, margin: 4 };
+        case 'medium':
+        default: return { cellSize: 12, margin: 3 };
+      }
+    };
     // Create SVG element
     const { cellSize, margin } = getSize();
     const width = 53 * (cellSize + margin); // 53 weeks in worst case
@@ -183,7 +164,24 @@ const CommitFrequencyChart = ({ size = 'medium' }) => {
     
     // Append to container
     containerRef.current.appendChild(svg);
-  };
+  }, [darkMode, size, yearOffset]);
+
+  useEffect(() => {
+    if (!contributions || !contributions.commits || contributions.commits.length === 0) {
+      return;
+    }
+  
+    let commits = contributions.commits;
+  
+    if (selectedRepo !== 'all') {
+      commits = commits.filter(commit =>
+        commit.repository && commit.repository.name === selectedRepo
+      );
+    }
+  
+    renderHeatmap(commits);
+  }, [contributions, darkMode, selectedRepo, yearOffset, renderHeatmap]);
+  
 
   // Helper function to get week number from date
   const getWeekNumber = (date) => {
@@ -200,6 +198,18 @@ const CommitFrequencyChart = ({ size = 'medium' }) => {
     }
   };
 
+  // Generate year options
+  const yearOptions = [];
+  const currentYear = new Date().getFullYear();
+  for (let i = 0; i < 3; i++) {
+    yearOptions.push({
+      value: i,
+      label: i === 0 ? 'This Year' : 
+             i === 1 ? 'Last Year' : 
+             `${currentYear - i}`
+    });
+  }
+
   return (
     <div className="w-full">
       <div className="mb-4 flex items-center justify-between">
@@ -209,9 +219,9 @@ const CommitFrequencyChart = ({ size = 'medium' }) => {
             onChange={(e) => setSelectedRepo(e.target.value)}
             className="text-sm p-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
           >
-            <option value="all">All Repositories</option>
+            <option key="all" value="all">All Repositories</option>
             {repositories && repositories.map(repo => (
-              <option key={repo.id} value={repo.name}>{repo.name}</option>
+              <option key={repo.id || repo.name} value={repo.name}>{repo.name}</option>
             ))}
           </select>
           
@@ -220,9 +230,9 @@ const CommitFrequencyChart = ({ size = 'medium' }) => {
             onChange={(e) => setYearOffset(Number(e.target.value))}
             className="text-sm p-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200"
           >
-            <option value={0}>This Year</option>
-            <option value={1}>Last Year</option>
-            <option value={2}>Two Years Ago</option>
+            {yearOptions.map(option => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
           </select>
         </div>
         
@@ -246,7 +256,7 @@ const CommitFrequencyChart = ({ size = 'medium' }) => {
         <div className="flex items-center space-x-1">
           {[0.1, 0.3, 0.5, 0.7, 0.9].map(opacity => (
             <div 
-              key={opacity}
+              key={`opacity-${opacity}`}
               className="w-3 h-3 rounded"
               style={{ 
                 backgroundColor: darkMode 

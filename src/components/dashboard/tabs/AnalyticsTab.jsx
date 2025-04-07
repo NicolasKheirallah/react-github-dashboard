@@ -275,8 +275,8 @@ const AnalyticsTab = () => {
         <ul className="flex flex-wrap -mb-px text-sm font-medium">
           {sections.map(section => (
             <li className="mr-2" key={section.id}>
-              <a 
-                href="#" 
+<button 
+  type="button"
                 className={`inline-block p-4 ${
                   activeSection === section.id 
                     ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500 font-semibold' 
@@ -288,8 +288,8 @@ const AnalyticsTab = () => {
                 }}
               >
                 {section.label}
-              </a>
-            </li>
+                </button>
+                </li>
           ))}
         </ul>
       </div>

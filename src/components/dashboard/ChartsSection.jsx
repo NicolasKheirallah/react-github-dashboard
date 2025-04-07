@@ -286,14 +286,14 @@ const ChartsSection = () => {
       }
     });
     
-    // Cleanup on unmount
+    const currentCharts = { ...chartInstances.current };
     return () => {
-      Object.keys(chartInstances.current).forEach(key => {
-        if (chartInstances.current[key]) {
-          chartInstances.current[key].destroy();
+      Object.keys(currentCharts).forEach(key => {
+        if (currentCharts[key]) {
+          currentCharts[key].destroy();
         }
       });
-    };
+    };    
   }, [analytics, darkMode]);
   
   if (!analytics || !analytics.prTimeline) {
