@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useGithub } from '../../context/GithubContext';
 import { 
   DndContext, 
   closestCenter,
@@ -78,14 +77,17 @@ const CustomizableDashboard = () => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-  
+    const updateAvailableWidgets = useCallback((currentWidgets) => {
+      const widgetIds = currentWidgets.map(w => w.id);
+      const available = ALL_WIDGETS.filter(w => !widgetIds.includes(w.id));
+      setAvailableWidgets(available);
+    }, []);
   // Load saved layout or default
   useEffect(() => {
     const savedLayout = localStorage.getItem('dashboard-layout');
     try {
       if (savedLayout) {
         const parsedLayout = JSON.parse(savedLayout);
-        // Ensure all required properties are present
         const validatedLayout = parsedLayout.map(widget => {
           const matchedWidget = ALL_WIDGETS.find(w => w.id === widget.id);
           return { ...matchedWidget, ...widget };
@@ -94,29 +96,24 @@ const CustomizableDashboard = () => {
       } else {
         setWidgets(DEFAULT_LAYOUT);
       }
-      
-      // Set available widgets (those not already in the dashboard)
+  
       updateAvailableWidgets(savedLayout ? JSON.parse(savedLayout) : DEFAULT_LAYOUT);
-      
     } catch (e) {
       console.error("Error loading dashboard layout:", e);
       setWidgets(DEFAULT_LAYOUT);
       updateAvailableWidgets(DEFAULT_LAYOUT);
     }
-  }, []);
+  }, [updateAvailableWidgets]); // ✅ add dependency here
   
-  // Update available widgets
-  const updateAvailableWidgets = useCallback((currentWidgets) => {
-    const widgetIds = currentWidgets.map(w => w.id);
-    const available = ALL_WIDGETS.filter(w => !widgetIds.includes(w.id));
-    setAvailableWidgets(available);
-  }, []);
+  
+
   
   // Update visible widgets when widgets change
   useEffect(() => {
     setVisibleWidgets(widgets.filter(w => !w.hidden));
     updateAvailableWidgets(widgets);
   }, [widgets, updateAvailableWidgets]);
+  
     
   // Save layout when it changes
   useEffect(() => {
