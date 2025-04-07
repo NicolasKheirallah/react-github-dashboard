@@ -1,4 +1,3 @@
-// src/components/GitHubOAuth.jsx
 import React, { useState, useEffect } from 'react';
 
 const GitHubOAuth = ({ onLogin }) => {

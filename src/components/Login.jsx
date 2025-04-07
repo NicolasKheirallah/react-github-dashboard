@@ -1,4 +1,3 @@
-// src/components/Login.jsx
 import React, { useState, useEffect } from 'react';
 import { useGithub } from '../context/GithubContext';
 import { testTokenValidity } from '../services/githubService';

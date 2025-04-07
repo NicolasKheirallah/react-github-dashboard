@@ -1,4 +1,3 @@
-// src/components/dashboard/ChartsSection.jsx
 import React, { useEffect, useRef } from 'react';
 import { useGithub } from '../../context/GithubContext';
 import Chart from 'chart.js/auto';

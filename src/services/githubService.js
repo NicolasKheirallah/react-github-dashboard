@@ -1,4 +1,3 @@
-// src/services/githubService.js
 
 // GitHub API base URL with https://
 const API_BASE_URL = 'https://api.github.com';
@@ -217,6 +216,7 @@ export const fetchWatchedRepos = async (token) => {
     return [];
   }
 };
+
 // Fetch user notifications
 export const fetchNotifications = async (token) => {
   const url = `${API_BASE_URL}/notifications?all=false`;
@@ -259,6 +259,7 @@ export const markNotificationAsRead = async (token, notificationId) => {
     throw error;
   }
 };
+
 export const fetchUserEvents = async (token) => {
   try {
     // First fetch user info to get the username
@@ -278,7 +279,188 @@ export const fetchUserEvents = async (token) => {
   }
 };
 
-// Function to fetch all GitHub data in parallel with improved error handling
+// ====== NEW METHODS FOR ENHANCED DATA ======
+
+// Fetch Pull Request details including review data
+export const fetchPRDetails = async (token, owner, repo, prNumber) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/pulls/${prNumber}`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    const prData = await fetchWithRetry(url, options);
+    
+    // Fetch reviews for this PR
+    const reviewsUrl = `${API_BASE_URL}/repos/${owner}/${repo}/pulls/${prNumber}/reviews`;
+    const reviews = await fetchAllPages(reviewsUrl, token);
+    
+    // Add reviews to PR data
+    return {
+      ...prData,
+      reviews: reviews || []
+    };
+  } catch (error) {
+    console.error(`Error fetching PR details for ${owner}/${repo}#${prNumber}:`, error);
+    return null;
+  }
+};
+
+// Fetch a repository's commit statistics (weekly commit counts)
+export const fetchRepoCommitStats = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/stats/participation`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error(`Error fetching commit stats for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch a repository's contributor statistics
+export const fetchContributorStats = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/stats/contributors`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error(`Error fetching contributor stats for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch code frequency statistics (additions/deletions per week)
+export const fetchCodeFrequencyStats = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/stats/code_frequency`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error(`Error fetching code frequency stats for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch commit activity stats (commits per day of week)
+export const fetchCommitActivityStats = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/stats/commit_activity`;
+  const options = {
+    headers: getHeaders(token),
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    console.error(`Error fetching commit activity stats for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch project boards associated with user
+export const fetchProjectBoards = async (token) => {
+  const url = `${API_BASE_URL}/user/projects`;
+  const options = {
+    headers: {
+      ...getHeaders(token),
+      'Accept': 'application/vnd.github.inertia-preview+json' // Required for projects API
+    },
+  };
+  
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error('Error fetching project boards:', error);
+    return [];
+  }
+};
+
+// Fetch recent commits for a specific repository
+export const fetchRepoCommits = async (token, owner, repo, since = null) => {
+  let url = `${API_BASE_URL}/repos/${owner}/${repo}/commits`;
+  
+  if (since) {
+    // Format date as ISO string and add to URL
+    const sinceDate = new Date(since);
+    url += `?since=${sinceDate.toISOString()}`;
+  }
+  
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching commits for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch pull request review comments for a specific repo
+export const fetchPRReviewComments = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/pulls/comments`;
+  
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error(`Error fetching PR review comments for ${owner}/${repo}:`, error);
+    return [];
+  }
+};
+
+// Fetch security vulnerabilities for a repo
+export const fetchRepoVulnerabilities = async (token, owner, repo) => {
+  const url = `${API_BASE_URL}/repos/${owner}/${repo}/vulnerability-alerts`;
+  const options = {
+    headers: {
+      ...getHeaders(token),
+      'Accept': 'application/vnd.github.dorian-preview+json' // Required for vulnerability alerts API
+    },
+  };
+  
+  try {
+    return await fetchWithRetry(url, options);
+  } catch (error) {
+    // Often returns 404 if no vulnerabilities or if feature not enabled
+    if (error.message && error.message.includes('404')) {
+      return { enabled: false, alerts: [] };
+    }
+    console.error(`Error fetching vulnerabilities for ${owner}/${repo}:`, error);
+    return null;
+  }
+};
+
+// Fetch user followers
+export const fetchFollowers = async (token) => {
+  const url = `${API_BASE_URL}/user/followers`;
+  
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error('Error fetching followers:', error);
+    return [];
+  }
+};
+
+// Fetch user following
+export const fetchFollowing = async (token) => {
+  const url = `${API_BASE_URL}/user/following`;
+  
+  try {
+    return await fetchAllPages(url, token);
+  } catch (error) {
+    console.error('Error fetching following:', error);
+    return [];
+  }
+};
+
+// Enhanced function to fetch all GitHub data in parallel with improved error handling
 export const fetchAllGithubData = async (token) => {
   try {
     // First validate the token
@@ -297,14 +479,18 @@ export const fetchAllGithubData = async (token) => {
       repositories, 
       organizations, 
       starredRepos, 
-      userEvents
+      userEvents,
+      followers,
+      following
     ] = await Promise.all([
       fetchPullRequests(token),
       fetchIssuesCreated(token),
       fetchRepositories(token),
       fetchOrganizations(token),
       fetchStarredRepos(token),
-      fetchUserEvents(token)
+      fetchUserEvents(token),
+      fetchFollowers(token),
+      fetchFollowing(token)
     ]);
     
     return {
@@ -314,10 +500,56 @@ export const fetchAllGithubData = async (token) => {
       repositories,
       organizations,
       starredRepos,
-      userEvents
+      userEvents,
+      followers,
+      following
     };
   } catch (error) {
     console.error('Error fetching GitHub data:', error);
     throw error;
+  }
+};
+
+// Fetch detailed repository data including statistics for a specific repo
+export const fetchDetailedRepoData = async (token, owner, repo) => {
+  try {
+    const [
+      commitStats,
+      contributorStats,
+      codeFrequency,
+      commitActivity,
+      recentCommits,
+      prReviewComments,
+      vulnerabilities
+    ] = await Promise.all([
+      fetchRepoCommitStats(token, owner, repo),
+      fetchContributorStats(token, owner, repo),
+      fetchCodeFrequencyStats(token, owner, repo),
+      fetchCommitActivityStats(token, owner, repo),
+      fetchRepoCommits(token, owner, repo),
+      fetchPRReviewComments(token, owner, repo),
+      fetchRepoVulnerabilities(token, owner, repo)
+    ]);
+    
+    return {
+      commitStats,
+      contributorStats,
+      codeFrequency,
+      commitActivity,
+      recentCommits,
+      prReviewComments,
+      vulnerabilities
+    };
+  } catch (error) {
+    console.error(`Error fetching detailed repo data for ${owner}/${repo}:`, error);
+    return {
+      commitStats: null,
+      contributorStats: [],
+      codeFrequency: [],
+      commitActivity: [],
+      recentCommits: [],
+      prReviewComments: [],
+      vulnerabilities: null
+    };
   }
 };

@@ -1,4 +1,3 @@
-// src/components/dashboard/TabsSection.jsx
 import React from 'react';
 import { useGithub } from '../../context/GithubContext';
 
