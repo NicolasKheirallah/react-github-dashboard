@@ -41,10 +41,25 @@ export function GithubProvider({ children, value }) {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light');
   }, [darkMode]);
 
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-  };
+const toggleDarkMode = () => {
+  // Apply a class that temporarily disables transitions for performance
+  document.documentElement.classList.add('no-transition');
+  
+  setDarkMode(prevMode => {
+    const newMode = !prevMode;
+    document.documentElement.classList.toggle('dark', newMode);
+    localStorage.setItem('theme', newMode ? 'dark' : 'light');
+    return newMode;
+  });
+  
+  // Force a reflow to ensure transitions are disabled during class changes
+  window.getComputedStyle(document.documentElement).getPropertyValue('color');
+  
+  // Re-enable transitions after the theme change
+  setTimeout(() => {
+    document.documentElement.classList.remove('no-transition');
+  }, 50);
+};
 
   // Clear all data
   const clearData = () => {

@@ -1,126 +1,86 @@
 import React, { useState, useEffect } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { fetchAllContributorData } from '../../../services/githubService';
 
 const ContributorsTab = ({ searchQuery, sortOption }) => {
-  const { repositories, contributions, pullRequests } = useGithub();
+  const { repositories, pullRequests, token } = useGithub();
   const [contributors, setContributors] = useState([]);
   const [filteredContributors, setFilteredContributors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Extract and process contributor data from repositories and PRs
+  // Fetch contributors using the integrated GitHub service
   useEffect(() => {
-    if (!repositories || !pullRequests) {
+    const getContributors = async () => {
       setLoading(true);
-      return;
-    }
-
-    // Collect contributors from all available data
-    const contributorsMap = new Map();
-
-    // Process PR authors
-    if (Array.isArray(pullRequests)) {
-      pullRequests.forEach(pr => {
-        if (pr && pr.user) {
-          const user = pr.user;
-          if (user && user.id && !contributorsMap.has(user.id)) {
-            contributorsMap.set(user.id, {
-              id: user.id,
-              login: user.login || 'unknown',
-              name: user.name || user.login || 'unknown',
-              avatar_url: user.avatar_url || '',
-              html_url: user.html_url || '#',
-              contributions: 0,
-              pullRequests: 0,
-              repositories: new Set(),
-            });
-          }
-
-          if (user && user.id) {
-            const contributor = contributorsMap.get(user.id);
-            if (contributor) {
-              contributor.pullRequests += 1;
-              if (pr.repository && pr.repository.name) {
-                contributor.repositories.add(pr.repository.name);
-              }
-            }
-          }
+      setError(null);
+      
+      try {
+        // Log what data we're working with
+        console.log(`Fetching contributors data with ${repositories?.length || 0} repositories and ${pullRequests?.length || 0} pull requests`);
+        
+        if (!token) {
+          throw new Error('GitHub token not available');
         }
-      });
-    }
-
-    // Process contributors from repository data if available
-    if (Array.isArray(repositories)) {
-      repositories.forEach(repo => {
-        if (repo && repo.owner) {
-          const owner = repo.owner;
-          if (owner && owner.id && !contributorsMap.has(owner.id)) {
-            contributorsMap.set(owner.id, {
-              id: owner.id,
-              login: owner.login || 'unknown',
-              name: owner.login || 'unknown',
-              avatar_url: owner.avatar_url || '',
-              html_url: owner.html_url || '#',
-              contributions: 0,
-              pullRequests: 0,
-              repositories: new Set([repo.name]),
-            });
-          } else if (owner && owner.id) {
-            const contributor = contributorsMap.get(owner.id);
-            if (contributor && repo.name) {
-              contributor.repositories.add(repo.name);
+        
+        // Fetch contributors directly from GitHub API
+        const contributorsData = await fetchAllContributorData(token, repositories, pullRequests);
+        
+        console.log(`Fetched ${contributorsData.length} contributors from GitHub API`);
+        setContributors(contributorsData);
+      } catch (err) {
+        console.error('Error fetching contributors:', err);
+        setError(err.message || 'Failed to load contributors');
+        
+        // In development mode, use dummy data
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Using dummy data for development');
+          setContributors([
+            {
+              id: 'dev1',
+              login: 'developer1',
+              name: 'Developer One',
+              avatar_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
+              html_url: 'https://github.com/developer1',
+              contributions: 35,
+              pullRequests: 12,
+              repositories: ['repo1', 'repo2', 'repo3'],
+              repoCount: 3,
+              totalActivity: 47
+            },
+            {
+              id: 'dev2',
+              login: 'developer2',
+              name: 'Developer Two',
+              avatar_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
+              html_url: 'https://github.com/developer2',
+              contributions: 28,
+              pullRequests: 5,
+              repositories: ['repo1', 'repo4'],
+              repoCount: 2,
+              totalActivity: 33
+            },
+            {
+              id: 'dev3',
+              login: 'developer3',
+              name: 'Developer Three',
+              avatar_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
+              html_url: 'https://github.com/developer3',
+              contributions: 42,
+              pullRequests: 9,
+              repositories: ['repo2', 'repo3', 'repo5', 'repo6'],
+              repoCount: 4,
+              totalActivity: 51
             }
-          }
+          ]);
         }
-      });
-    }
-
-    // Process commit contributors if available
-    if (contributions && contributions.commits && Array.isArray(contributions.commits)) {
-      contributions.commits.forEach(commit => {
-        if (commit && commit.author) {
-          const author = commit.author;
-          if (author && author.id && !contributorsMap.has(author.id)) {
-            contributorsMap.set(author.id, {
-              id: author.id,
-              login: author.login || 'unknown',
-              name: author.name || author.login || 'unknown',
-              avatar_url: author.avatar_url || '',
-              html_url: author.html_url || '#',
-              contributions: 1,
-              pullRequests: 0,
-              repositories: new Set(),
-            });
-          } else if (author && author.id) {
-            const contributor = contributorsMap.get(author.id);
-            if (contributor) {
-              contributor.contributions += 1;
-            }
-          }
-
-          // Add repository if available
-          if (author && author.id && commit.repository && commit.repository.name) {
-            const contributor = contributorsMap.get(author.id);
-            if (contributor) {
-              contributor.repositories.add(commit.repository.name);
-            }
-          }
-        }
-      });
-    }
-
-    // Convert Map to array and finalize data structure
-    const contributorsArray = Array.from(contributorsMap.values())
-      .filter(Boolean) // Make sure we don't have any undefined entries
-      .map(contributor => ({
-        ...contributor,
-        repositories: Array.from(contributor.repositories || []),
-        repoCount: contributor.repositories ? contributor.repositories.size : 0,
-        totalActivity: (contributor.contributions || 0) + (contributor.pullRequests || 0),
-      }));
-
-    setContributors(contributorsArray);
-    setLoading(false);
-  }, [repositories, pullRequests, contributions]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    getContributors();
+  }, [repositories, pullRequests, token]);
 
   // Filter and sort contributors based on search query and sort option
   useEffect(() => {
@@ -173,12 +133,29 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
     }
 
     setFilteredContributors(filtered);
+    console.log(`Filtered to ${filtered.length} contributors`);
   }, [contributors, searchQuery, sortOption]);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center py-10">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        <span className="ml-3 text-gray-600 dark:text-gray-300">Loading contributors...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="py-10 text-center text-red-500 dark:text-red-400">
+        <div className="mb-4">Error loading contributors</div>
+        <div className="text-sm">{error}</div>
+        <button 
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -186,16 +163,33 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
   if (!filteredContributors || filteredContributors.length === 0) {
     return (
       <div className="py-10 text-center text-gray-500 dark:text-gray-400">
-        {searchQuery 
-          ? `No contributors found matching "${searchQuery}"`
-          : "No contributors data available"
-        }
+        <div className="mb-4">
+          {searchQuery 
+            ? `No contributors found matching "${searchQuery}"`
+            : "No contributors data available"
+          }
+        </div>
+        <div className="text-sm max-w-lg mx-auto">
+          <p>This could be due to:</p>
+          <ul className="list-disc pl-5 text-left mt-2">
+            <li>Limited access to contributor data with your current GitHub token</li>
+            <li>The repositories analyzed don't have multiple contributors</li>
+            <li>GitHub API rate limiting prevented fetching all contributor data</li>
+          </ul>
+          <p className="mt-2">Try refreshing the page or analyzing different repositories.</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+        <div className="text-gray-600 dark:text-gray-300 text-sm">
+          Showing {filteredContributors.length} {filteredContributors.length === 1 ? 'contributor' : 'contributors'}
+        </div>
+      </div>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
         {filteredContributors.map(contributor => (
           <div 
