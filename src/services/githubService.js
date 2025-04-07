@@ -61,39 +61,35 @@ const fetchWithRetry = async (url, options, retries = 3, delay = 1000) => {
 };
 
 // Function to fetch all pages of a paginated API - improved with better error handling
-const fetchAllPages = async (url, token) => {
+const fetchAllPages = async (url, token, customOptions) => {
   let page = 1;
   let allData = [];
   let hasNextPage = true;
-  
-  const options = {
-    headers: getHeaders(token),
-  };
-  
+
+  // Use custom options if provided, otherwise default to getHeaders(token)
+  const options = customOptions || { headers: getHeaders(token) };
+
   while (hasNextPage) {
     try {
-      const pageUrl = url.includes('?') 
-        ? `${url}&page=${page}&per_page=100` 
+      const pageUrl = url.includes('?')
+        ? `${url}&page=${page}&per_page=100`
         : `${url}?page=${page}&per_page=100`;
-      
+
       console.log(`Fetching: ${pageUrl}`);
       const response = await fetch(pageUrl, options);
-      
-      // Check if response is OK
+
       if (!response.ok) {
         console.error(`API error: ${response.status} for ${pageUrl}`);
         throw new Error(`API error: ${response.status} ${response.statusText}`);
       }
-      
+
       const data = await response.json();
-      
-      // Check if data is an array
+
       if (!Array.isArray(data)) {
         console.warn(`Expected array but got: ${typeof data}`, data);
-        // If not an array but we have data, return it wrapped in an array
         return data.items ? data.items : (typeof data === 'object' ? [data] : []);
       }
-      
+
       if (data.length === 0) {
         hasNextPage = false;
       } else {
@@ -103,17 +99,13 @@ const fetchAllPages = async (url, token) => {
     } catch (error) {
       console.error(`Error fetching page ${page}:`, error);
       hasNextPage = false;
-      // Return what we have so far instead of failing completely
-      if (allData.length > 0) {
-        return allData;
-      }
-      // If we have nothing, return empty array to prevent further errors
-      return [];
+      return allData.length > 0 ? allData : [];
     }
   }
-  
+
   return allData;
 };
+
 
 // API Functions
 
@@ -368,20 +360,21 @@ export const fetchCommitActivityStats = async (token, owner, repo) => {
 // Fetch project boards associated with user
 export const fetchProjectBoards = async (token) => {
   const url = `${API_BASE_URL}/user/projects`;
-  // const options = {
-  //   headers: {
-  //     ...getHeaders(token),
-  //     'Accept': 'application/vnd.github.inertia-preview+json' // Required for projects API
-  //   },
-  // };
-  
+  const options = {
+    headers: {
+      ...getHeaders(token),
+      'Accept': 'application/vnd.github.inertia-preview+json' // Required for projects API
+    },
+  };
+
   try {
-    return await fetchAllPages(url, token);
+    return await fetchAllPages(url, token, options);
   } catch (error) {
     console.error('Error fetching project boards:', error);
     return [];
   }
 };
+
 
 // Fetch recent commits for a specific repository
 export const fetchRepoCommits = async (token, owner, repo, since = null) => {
@@ -884,16 +877,17 @@ export const fetchGraphQLData = async (token, query, variables = {}) => {
 // Fetch code scanning alerts for a repository
 export const fetchCodeScanningAlerts = async (token, owner, repo) => {
   const url = `${API_BASE_URL}/repos/${owner}/${repo}/code-scanning/alerts`;
-  // const options = {
-  //   headers: getHeaders(token)
-  // };
+  const options = {
+    headers: getHeaders(token)
+  };
   try {
-    return await fetchAllPages(url, token);
+    return await fetchAllPages(url, token, options);
   } catch (error) {
     console.error(`Error fetching code scanning alerts for ${owner}/${repo}:`, error);
     return [];
   }
 };
+
 
 // Fetch rate limit status
 export const fetchRateLimit = async (token) => {

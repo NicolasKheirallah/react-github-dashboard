@@ -45,13 +45,11 @@ const Dashboard = () => {
   
   // Dashboard preferences
   const [dashboardType, setDashboardType] = useState(() => {
-    // Load dashboard preference from localStorage or default to standard
     const saved = localStorage.getItem('github-dashboard-type');
     return saved || 'standard';
   });
   
   const [dashboardView, setDashboardView] = useState(() => {
-    // Load view preference from localStorage or default to default
     const saved = localStorage.getItem('github-dashboard-view');
     return saved || 'default';
   });
@@ -96,7 +94,8 @@ const Dashboard = () => {
     };
     
     loadData();
-  }, [token]); // Only re-run if token changes
+  // Added all the setter dependencies to satisfy ESLint
+  }, [token, setUserData, setPullRequests, setIssues, setRepositories, setOrganizations, setStarredRepos, setContributions, setAnalytics, setError, setLoading]);
   
   // Toggle between dashboard types
   const toggleDashboardType = () => {
@@ -144,7 +143,6 @@ const Dashboard = () => {
       </h2>
       
       <div className="flex items-center space-x-4">
-        {/* View selector */}
         <div className="relative inline-block">
           <select
             value={dashboardView}
@@ -158,7 +156,6 @@ const Dashboard = () => {
           </select>
         </div>
         
-        {/* Dashboard type toggle */}
         <button
           onClick={toggleDashboardType}
           className={`flex items-center px-4 py-2 rounded-md text-sm transition-colors ${
@@ -288,13 +285,23 @@ const Dashboard = () => {
               sortOption={sortOption}
               onSortChange={handleSort}
             />
+            {/* New section using PRReviewTimeChart and IssueResolutionChart */}
+            <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 rounded-t-lg">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Review & Resolution Analytics</h2>
+              </div>
+              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <PRReviewTimeChart size="small" />
+                <IssueResolutionChart size="small" />
+              </div>
+            </div>
           </>
         );
     }
   };
   
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className={`container mx-auto px-4 py-8 max-w-7xl ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       {renderDashboard()}
     </div>
   );
