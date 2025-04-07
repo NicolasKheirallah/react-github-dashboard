@@ -133,48 +133,50 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
       type: 'pie',
       data: {
         labels: chartData.labels,
-        datasets: [{
-          data: chartData.counts,
-          backgroundColor: chartData.labels.map(label => colors[label]),
-          borderColor: backgroundColor,
-          borderWidth: 2
-        }]
+        datasets: [
+          {
+            data: chartData.counts,
+            backgroundColor: chartData.labels.map(label => colors[label]),
+            borderColor: backgroundColor,
+            borderWidth: 2,
+          },
+        ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        aspectRatio: 1.2, // Try 1.2–2.0 range to find a good fit
         layout: {
           padding: {
-            top: 30,
+            top: 10,
             bottom: 10,
-            left: 20,
-            right: 20
-          }
+            left: 10,
+            right: 10,
+          },
         },
+    
         plugins: {
           legend: {
-            position: 'right',
-            align: 'center',
+            position: 'bottom', // Move legend to the bottom
             labels: {
-              generateLabels: function(chart) {
+              generateLabels: function (chart) {
                 const data = chart.data;
                 if (data.labels.length && data.datasets.length) {
                   return data.labels.map((label, i) => {
                     const meta = chart.getDatasetMeta(0);
                     const style = meta.controller.getStyle(i);
-                    
-                    // Format the label text with proper counts
                     const count = chartData.counts[i];
-                    const displayCount = count < 1 ? 0 : count; // Show 0 for placeholder values
+                    const displayCount = count < 1 ? 0 : count;
                     const percentage = chartData.percentages[i];
-                    
+    
                     return {
-                      text: `${label} (${getLinesDescription(label)}): ${displayCount} (${percentage}%)`,
+                      text: `${label}: ${displayCount} (${percentage}%)`,
                       fillStyle: style.backgroundColor,
                       strokeStyle: style.borderColor,
                       lineWidth: style.borderWidth,
-                      hidden: false, // Always show all categories
-                      index: i
+                      hidden: false,
+                      index: i,
+                      color: textColor,
                     };
                   });
                 }
@@ -182,15 +184,11 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
               },
               color: textColor,
               font: {
-                size: 12
+                size: 12,
               },
               boxWidth: 12,
-              padding: 15
+              padding: 15,
             },
-            title: {
-              color: textColor,
-              display: false // Disable legend title to prevent overlap
-            }
           },
           tooltip: {
             backgroundColor: isDarkMode ? '#374151' : '#ffffff',
@@ -269,12 +267,16 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
 
   const getChartHeight = () => {
     switch (size) {
-      case 'small': return 'h-48';
-      case 'large': return 'h-96';
+      case 'small':
+        return 'h-48';
+      case 'large':
+        return 'h-96';
       case 'medium':
-      default: return 'h-72'; // Increased from h-64 to h-72 for more vertical space
+      default:
+        return 'h-72';
     }
   };
+  
 
   return (
     <div className="w-full">
@@ -288,8 +290,8 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
       
       <div className={`w-full ${getChartHeight()} bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden`}>
         {chartData ? (
-          <div className="w-full h-full pt-2">
-            <canvas ref={chartRef}></canvas>
+          <div className="w-full h-96 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+          <canvas ref={chartRef}></canvas>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -320,9 +322,12 @@ const PRSizeDistributionChart = ({ size = 'medium' }) => {
                   }}
                 ></div>
                 <div className="font-medium">{label}</div>
-                <div className="text-gray-500 dark:text-gray-400">{displayCount} ({percentage}%)</div>
-                <div className="text-gray-400 dark:text-gray-500 text-[10px]">{getLinesDescription(label)}</div>
-              </div>
+                <div className="text-gray-500 dark:text-gray-200">
+  {displayCount} ({percentage}%)
+</div>
+<div className="text-gray-400 dark:text-gray-200 text-[10px]">
+  {getLinesDescription(label)}
+</div>              </div>
             );
           })}
         </div>

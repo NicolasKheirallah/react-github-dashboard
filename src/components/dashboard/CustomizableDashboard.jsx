@@ -41,7 +41,7 @@ const ALL_WIDGETS = [
   { id: 'issue-types', title: 'Issue Types', description: 'Breakdown of issues by type', size: 'medium', component: IssueTypesChart, favorite: false, category: 'issues' },
   { id: 'issue-resolution', title: 'Issue Resolution Time', description: 'How quickly issues are resolved', size: 'medium', component: IssueResolutionChart, favorite: false, category: 'issues' },
   { id: 'pr-review-time', title: 'PR Review Time', description: 'How long PRs take to be reviewed', size: 'medium', component: PRReviewTimeChart, favorite: false, category: 'pullRequests' },
-  { id: 'pr-size-distribution', title: 'PR Size Distribution', description: 'Size distribution of your PRs', size: 'medium', component: PRSizeDistributionChart, favorite: false, category: 'pullRequests' },
+  { id: 'pr-size-distribution', title: 'PR Size Distribution', description: 'Size distribution of your PRs', size: 'large', component: PRSizeDistributionChart, favorite: false, category: 'pullRequests' },
   { id: 'code-churn', title: 'Code Churn', description: 'Code additions and deletions over time', size: 'large', component: CodeChurnChart, favorite: false, category: 'repositories' },
   { id: 'collaboration-network', title: 'Collaboration Network', description: 'Your network of collaborators', size: 'large', component: CollaborationNetwork, favorite: false, category: 'activity' },
   { id: 'commit-calendar', title: 'Commit Calendar', description: 'Calendar view of your commit activity', size: 'large', component: CommitCalendar, favorite: false, category: 'activity' },

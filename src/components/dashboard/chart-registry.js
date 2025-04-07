@@ -100,7 +100,7 @@ const AVAILABLE_WIDGETS = [
     title: 'PR Size Distribution',
     description: 'Distribution of pull requests by size',
     component: PRSizeDistributionChart,
-    defaultSize: 'small',
+    defaultSize: 'large',
     category: 'pull-requests'
   },
   {
