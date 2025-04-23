@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
-const AdvancedFilterManager = ({ onApplyFilter, initialFilters = [] }) => {
+const AdvancedFilterManager = ({ onApplyFilter,
+    initialFilters = []}) => {
     const [savedFilters, setSavedFilters] = useState([]);
     const [activeFilter, setActiveFilter] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -12,19 +13,34 @@ const AdvancedFilterManager = ({ onApplyFilter, initialFilters = [] }) => {
         { field: 'name', operator: 'contains', value: '' }
     ]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [categories, setCategories] = useState([
-        { id: 'all', name: 'All' },
-        { id: 'frontend', name: 'Frontend' },
-        { id: 'backend', name: 'Backend' },
-    ]);
-    const [timeRanges, setTimeRanges] = useState([
-        { id: 'all', name: 'All Time' },
-        { id: 'week', name: 'Last Week' },
-        { id: 'month', name: 'Last Month' },
-    ]);
+    const [categories, setCategories] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [timeRange, setTimeRange] = useState('all');
+    const [timeRange,  setTimeRange]  = useState('all');
+    const [timeRanges, setTimeRanges] = useState([
+        { id: 'all',   name: 'All Time' },
+        { id: 'day',   name: 'Last 24 Hours' },
+        { id: 'week',  name: 'Last Week' },
+        { id: 'month', name: 'Last Month' },
+        { id: 'year',  name: 'Last Year' },
+      ]);
+      
 
+    useEffect(() => {
+        // pretend we fetched these from an API or defined them once here
+        const defaultCats = [
+            { id: 'all', name: 'All' },
+            { id: 'frontend', name: 'Frontend' },
+            { id: 'backend', name: 'Backend' },
+        ];
+        const defaultTRs = [
+            { id: 'all', name: 'All Time' },
+            { id: 'week', name: 'Last Week' },
+            { id: 'month', name: 'Last Month' },
+        ];
+
+        setCategories(defaultCats);
+        setTimeRanges(defaultTRs);
+    }, []);
     // Load saved filters from localStorage on component mount
     useEffect(() => {
         try {
@@ -293,8 +309,8 @@ const AdvancedFilterManager = ({ onApplyFilter, initialFilters = [] }) => {
                     <ul className="space-y-2">
                         {savedFilters.map(filter => (
                             <li key={filter.id} className={`p-3 border rounded-lg ${activeFilter?.id === filter.id
-                                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
-                                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-500'
+                                : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
                                 }`}>
                                 <div className="flex justify-between items-start">
                                     <div>
@@ -516,13 +532,36 @@ const AdvancedFilterManager = ({ onApplyFilter, initialFilters = [] }) => {
             )}
 
             {/* Save Current Filter Modal */}
+            {/* Save Current Filter Modal */}
             {showSaveFilterModal && (
                 <div className="fixed inset-0 z-50 overflow-y-auto">
-                    <div className="fixed inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75" onClick={() => setShowSaveFilterModal(false)} />
+                    {/* backdrop */}
+                    <div
+                        className="fixed inset-0 bg-gray-500 dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75"
+                        onClick={() => setShowSaveFilterModal(false)}
+                    />
                     <div className="flex items-center justify-center min-h-screen px-4 text-center">
-                        <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-xl transform transition-all sm:max-w-lg w-full">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-xl sm:max-w-lg w-full">
                             <div className="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">Save Current Filter</h3>
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                                    Save Current Filter
+                                </h3>
+                                {/* Filter Name */}
+                                <div className="mt-4">
+                                    <label htmlFor="save-filter-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Filter Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="save-filter-name"
+                                        value={newFilterName}
+                                        onChange={e => setNewFilterName(e.target.value)}
+                                        className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+                                        placeholder="My Custom Filter"
+                                    />
+                                </div>
+
+                                {/* ← Insert your Category picker here */}
                                 <div className="mt-4">
                                     <label htmlFor="save-filter-category" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Category
@@ -534,13 +573,12 @@ const AdvancedFilterManager = ({ onApplyFilter, initialFilters = [] }) => {
                                         className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700"
                                     >
                                         {categories.map(c => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.name}
-                                            </option>
+                                            <option key={c.id} value={c.id}>{c.name}</option>
                                         ))}
                                     </select>
                                 </div>
 
+                                {/* ← Insert your Time-range picker here */}
                                 <div className="mt-4">
                                     <label htmlFor="save-filter-timerange" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         Time Range
@@ -552,27 +590,36 @@ const AdvancedFilterManager = ({ onApplyFilter, initialFilters = [] }) => {
                                         className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700"
                                     >
                                         {timeRanges.map(t => (
-                                            <option key={t.id} value={t.id}>
-                                                {t.name}
-                                            </option>
+                                            <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
                                     </select>
                                 </div>
 
+                                {/* Existing Filter Settings summary */}
                                 <div className="mt-4 bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
                                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter Settings</h4>
                                     <div className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                                         <p><span className="font-medium">Query:</span> {searchQuery || '(Empty)'}</p>
-                                        <p><span className="font-medium">Category:</span> {categories.find(c => c.id === selectedCategory)?.name || 'All'}</p>
-                                        <p><span className="font-medium">Time Range:</span> {timeRanges.find(t => t.id === timeRange)?.name || 'All Time'}</p>
+                                        <p><span className="font-medium">Category:</span> {categories.find(c => c.id === selectedCategory)?.name}</p>
+                                        <p><span className="font-medium">Time Range:</span> {timeRanges.find(t => t.id === timeRange)?.name}</p>
                                     </div>
                                 </div>
                             </div>
+                            {/* modal actions */}
                             <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                                <button type="button" onClick={saveCurrentFilter} disabled={!newFilterName.trim()} className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm">
+                                <button
+                                    type="button"
+                                    onClick={saveCurrentFilter}
+                                    disabled={!newFilterName.trim()}
+                                    className="w-full inline-flex justify-center rounded-md border border-transparent px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 sm:ml-3 sm:w-auto sm:text-sm"
+                                >
                                     Save Filter
                                 </button>
-                                <button type="button" onClick={() => setShowSaveFilterModal(false)} className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSaveFilterModal(false)}
+                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                                >
                                     Cancel
                                 </button>
                             </div>
@@ -580,6 +627,7 @@ const AdvancedFilterManager = ({ onApplyFilter, initialFilters = [] }) => {
                     </div>
                 </div>
             )}
+
 
         </div>
     );
