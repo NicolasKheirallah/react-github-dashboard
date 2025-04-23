@@ -7,6 +7,8 @@ import Dashboard from './components/Dashboard';
 import CustomizableDashboard from './components/dashboard/CustomizableDashboard';
 import CommandPalette from './components/CommandPalette';
 import NotificationCenter from './components/NotificationCenter';
+import SearchPage from './components/SearchPage';
+import UnifiedSearch from './components/UnifiedSearch';
 import { GithubProvider } from './context/GithubContext';
 import './App.css';
 
@@ -62,6 +64,7 @@ function App() {
               notificationCenter={<NotificationCenter />}
               toggleDashboardType={toggleDashboardType}
               useCustomDashboard={useCustomDashboard}
+              searchComponent={<UnifiedSearch />}
             />
           )}
 
@@ -72,6 +75,16 @@ function App() {
                 element={
                   isAuthenticated ? (
                     useCustomDashboard ? <CustomizableDashboard /> : <Dashboard />
+                  ) : (
+                    <Login onLogin={handleLogin} />
+                  )
+                }
+              />
+              <Route
+                path="/search"
+                element={
+                  isAuthenticated ? (
+                    <SearchPage />
                   ) : (
                     <Login onLogin={handleLogin} />
                   )
@@ -100,7 +113,9 @@ function App() {
                         const element = document.createElement('a');
                         const file = new Blob([JSON.stringify({
                           dashboardLayout: localStorage.getItem('dashboard-layout'),
-                          theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+                          theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+                          savedFilters: localStorage.getItem('github-advanced-filters'),
+                          recentSearches: localStorage.getItem('github-recent-searches')
                         })], { type: 'application/json' });
                         element.href = URL.createObjectURL(file);
                         element.download = "github-dashboard-settings.json";
@@ -133,6 +148,12 @@ function App() {
                                   } else {
                                     document.documentElement.classList.remove('dark');
                                   }
+                                }
+                                if (settings.savedFilters) {
+                                  localStorage.setItem('github-advanced-filters', settings.savedFilters);
+                                }
+                                if (settings.recentSearches) {
+                                  localStorage.setItem('github-recent-searches', settings.recentSearches);
                                 }
                                 window.location.reload();
                               } catch (error) {
