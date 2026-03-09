@@ -7,6 +7,24 @@ This repo now includes:
 - CI for lint, test, build, and production dependency audit
 - GitHub Pages deployment on `main` / `master`
 - Pull request preview artifacts uploaded as workflow artifacts
+- Netlify configuration via `netlify.toml` with `dist` as the publish directory
+
+## Netlify
+
+This repo builds with Vite, so the deploy output directory is:
+
+```bash
+dist
+```
+
+If Netlify was previously configured through the UI for Create React App, override it to:
+
+```bash
+Build command: npm run build
+Publish directory: dist
+```
+
+The committed `netlify.toml` now carries those settings for future deploys.
 
 ## GitHub Pages
 
