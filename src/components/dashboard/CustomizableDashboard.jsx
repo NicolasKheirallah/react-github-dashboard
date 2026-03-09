@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   DndContext, 
   closestCenter,
@@ -8,63 +8,39 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableWidget } from './SortableWidget';
-
-// Import all chart components
-import ActivityHeatmap from './charts/ActivityHeatmap';
-import PRStatusChart from './charts/PRStatusChart';
-import LanguageChart from './charts/LanguageChart';
-import TimelineChart from './charts/TimelineChart';
-import CommitFrequencyChart from './charts/CommitFrequencyChart';
-import IssueTypesChart from './charts/IssueTypesChart';
-import IssueResolutionChart from './charts/IssueResolutionChart';
-import PRReviewTimeChart from './charts/PRReviewTimeChart';
-import PRSizeDistributionChart from './charts/PRSizeDistributionChart';
-import CodeChurnChart from './charts/CodeChurnChart';
-import CollaborationNetwork from './charts/CollaborationNetwork';
-import CommitCalendar from './charts/CommitCalendar';
-import RepositorySummary from './summaries/RepositorySummary';
-
-// Define all available widgets
-const ALL_WIDGETS = [
-  { id: 'activity-heatmap', title: 'Activity Overview', description: 'Shows your GitHub activity over time', size: 'large', component: ActivityHeatmap, favorite: false, category: 'activity' },
-  { id: 'pr-status', title: 'Pull Request Status', description: 'Distribution of open, closed, and merged PRs', size: 'medium', component: PRStatusChart, favorite: false, category: 'pullRequests' },
-  { id: 'language-stats', title: 'Language Distribution', description: 'Languages used across your repositories', size: 'medium', component: LanguageChart, favorite: false, category: 'repositories' },
-  { id: 'timeline', title: 'Contribution Timeline', description: 'Your contributions over time', size: 'large', component: TimelineChart, favorite: false, category: 'activity' },
-  { id: 'repo-summary', title: 'Repository Summary', description: 'Overview of your repositories', size: 'medium', component: RepositorySummary, favorite: false, category: 'repositories' },
-  { id: 'commit-frequency', title: 'Commit Frequency', description: 'How often you commit code', size: 'medium', component: CommitFrequencyChart, favorite: false, category: 'activity' },
-  { id: 'issue-types', title: 'Issue Types', description: 'Breakdown of issues by type', size: 'medium', component: IssueTypesChart, favorite: false, category: 'issues' },
-  { id: 'issue-resolution', title: 'Issue Resolution Time', description: 'How quickly issues are resolved', size: 'medium', component: IssueResolutionChart, favorite: false, category: 'issues' },
-  { id: 'pr-review-time', title: 'PR Review Time', description: 'How long PRs take to be reviewed', size: 'medium', component: PRReviewTimeChart, favorite: false, category: 'pullRequests' },
-  { id: 'pr-size-distribution', title: 'PR Size Distribution', description: 'Size distribution of your PRs', size: 'large', component: PRSizeDistributionChart, favorite: false, category: 'pullRequests' },
-  { id: 'code-churn', title: 'Code Churn', description: 'Code additions and deletions over time', size: 'large', component: CodeChurnChart, favorite: false, category: 'repositories' },
-  { id: 'collaboration-network', title: 'Collaboration Network', description: 'Your network of collaborators', size: 'large', component: CollaborationNetwork, favorite: false, category: 'activity' },
-  { id: 'commit-calendar', title: 'Commit Calendar', description: 'Calendar view of your commit activity', size: 'large', component: CommitCalendar, favorite: false, category: 'activity' },
-];
-
-// Default layout with essential widgets
-const DEFAULT_LAYOUT = [
-  ALL_WIDGETS.find(w => w.id === 'activity-heatmap'),
-  ALL_WIDGETS.find(w => w.id === 'pr-status'),
-  ALL_WIDGETS.find(w => w.id === 'language-stats'),
-  ALL_WIDGETS.find(w => w.id === 'timeline'),
-  ALL_WIDGETS.find(w => w.id === 'repo-summary'),
-];
+import { useDialogFocusTrap } from '../../hooks/useDialogFocusTrap';
+import { useDashboardLayout } from '../../hooks/useDashboardLayout';
+import { WIDGET_CATEGORIES } from './widgetCatalog';
 
 const CustomizableDashboard = () => {
-  const [widgets, setWidgets] = useState([]);
-  const [availableWidgets, setAvailableWidgets] = useState([]);
   const [editMode, setEditMode] = useState(false);
-  const [visibleWidgets, setVisibleWidgets] = useState([]);
   const [addWidgetModalOpen, setAddWidgetModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [widgetConfig, setWidgetConfig] = useState(null);
+  const {
+    widgets,
+    availableWidgets,
+    visibleWidgets,
+    handleDragEnd,
+    toggleWidgetVisibility,
+    toggleWidgetSize,
+    toggleFavorite,
+    addWidget,
+    removeWidget,
+    saveWidgetConfig: saveWidgetConfigToLayout,
+    resetLayout,
+    applyLayoutPreset,
+  } = useDashboardLayout();
+  const addWidgetSearchRef = useRef(null);
+  const widgetConfigTitleRef = useRef(null);
+  const addWidgetDialogRef = useDialogFocusTrap(addWidgetModalOpen, addWidgetSearchRef);
+  const widgetConfigDialogRef = useDialogFocusTrap(Boolean(widgetConfig), widgetConfigTitleRef);
   
   // Initialize sensors for drag and drop
   const sensors = useSensors(
@@ -77,117 +53,6 @@ const CustomizableDashboard = () => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-    const updateAvailableWidgets = useCallback((currentWidgets) => {
-      const widgetIds = currentWidgets.map(w => w.id);
-      const available = ALL_WIDGETS.filter(w => !widgetIds.includes(w.id));
-      setAvailableWidgets(available);
-    }, []);
-  // Load saved layout or default
-  useEffect(() => {
-    const savedLayout = localStorage.getItem('dashboard-layout');
-    try {
-      if (savedLayout) {
-        const parsedLayout = JSON.parse(savedLayout);
-        const validatedLayout = parsedLayout.map(widget => {
-          const matchedWidget = ALL_WIDGETS.find(w => w.id === widget.id);
-          return { ...matchedWidget, ...widget };
-        });
-        setWidgets(validatedLayout);
-      } else {
-        setWidgets(DEFAULT_LAYOUT);
-      }
-  
-      updateAvailableWidgets(savedLayout ? JSON.parse(savedLayout) : DEFAULT_LAYOUT);
-    } catch (e) {
-      console.error("Error loading dashboard layout:", e);
-      setWidgets(DEFAULT_LAYOUT);
-      updateAvailableWidgets(DEFAULT_LAYOUT);
-    }
-  }, [updateAvailableWidgets]); // ✅ add dependency here
-  
-  
-
-  
-  // Update visible widgets when widgets change
-  useEffect(() => {
-    setVisibleWidgets(widgets.filter(w => !w.hidden));
-    updateAvailableWidgets(widgets);
-  }, [widgets, updateAvailableWidgets]);
-  
-    
-  // Save layout when it changes
-  useEffect(() => {
-    if (widgets.length > 0) {
-      localStorage.setItem('dashboard-layout', JSON.stringify(widgets));
-    }
-  }, [widgets]);
-  
-  // Handle drag end event
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    
-    if (active.id !== over.id) {
-      // Find the indices of the source and destination items
-      const oldIndex = visibleWidgets.findIndex(widget => widget.id === active.id);
-      const newIndex = visibleWidgets.findIndex(widget => widget.id === over.id);
-      
-      // Reorder the visible widgets
-      const updatedVisibleWidgets = arrayMove(visibleWidgets, oldIndex, newIndex);
-      setVisibleWidgets(updatedVisibleWidgets);
-      
-      // Update the full widget list preserving hidden widgets
-      const newWidgets = [...widgets];
-      let visibleIndex = 0;
-      
-      // Update the order in the full widgets array
-      for (let i = 0; i < newWidgets.length; i++) {
-        if (!newWidgets[i].hidden) {
-          newWidgets[i] = updatedVisibleWidgets[visibleIndex];
-          visibleIndex++;
-        }
-      }
-      
-      setWidgets(newWidgets);
-    }
-  };
-  
-  // Toggle widget visibility
-  const toggleWidgetVisibility = (id) => {
-    setWidgets(widgets.map(widget => 
-      widget.id === id ? { ...widget, hidden: !widget.hidden } : widget
-    ));
-  };
-  
-  // Toggle widget size
-  const toggleWidgetSize = (id) => {
-    setWidgets(widgets.map(widget => {
-      if (widget.id === id) {
-        const sizes = ['small', 'medium', 'large'];
-        const currentIndex = sizes.indexOf(widget.size);
-        const nextSize = sizes[(currentIndex + 1) % sizes.length];
-        return { ...widget, size: nextSize };
-      }
-      return widget;
-    }));
-  };
-  
-  // Toggle favorite status
-  const toggleFavorite = (id) => {
-    setWidgets(widgets.map(widget => 
-      widget.id === id ? { ...widget, favorite: !widget.favorite } : widget
-    ));
-  };
-  
-  // Add a widget to the dashboard
-  const addWidget = (widget) => {
-    setWidgets([...widgets, { ...widget }]);
-    setAddWidgetModalOpen(false);
-  };
-  
-  // Remove widget from dashboard
-  const removeWidget = (id) => {
-    setWidgets(widgets.filter(widget => widget.id !== id));
-  };
   
   // Configure widget
   const openWidgetConfig = (widget) => {
@@ -196,9 +61,7 @@ const CustomizableDashboard = () => {
   
   // Save widget configuration
   const saveWidgetConfig = (updatedConfig) => {
-    setWidgets(widgets.map(widget => 
-      widget.id === updatedConfig.id ? { ...widget, ...updatedConfig } : widget
-    ));
+    saveWidgetConfigToLayout(updatedConfig);
     setWidgetConfig(null);
   };
   
@@ -210,15 +73,6 @@ const CustomizableDashboard = () => {
       widget.description.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCategory && matchesSearch;
   });
-
-  // Get applicable widget categories from available widgets
-  const categories = [
-    { id: 'all', name: 'All Categories' },
-    { id: 'activity', name: 'Activity' },
-    { id: 'repositories', name: 'Repositories' },
-    { id: 'pullRequests', name: 'Pull Requests' },
-    { id: 'issues', name: 'Issues' },
-  ];
 
   // Close all modals
   const closeAllModals = () => {
@@ -249,7 +103,7 @@ const CustomizableDashboard = () => {
                 Add Widget
               </button>
               <button
-                onClick={() => setWidgets(DEFAULT_LAYOUT)}
+                onClick={resetLayout}
                 className="px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 Reset Layout
@@ -272,6 +126,7 @@ const CustomizableDashboard = () => {
                       onClick={() => toggleWidgetVisibility(widget.id)}
                       className={`p-1 rounded-md ${widget.hidden ? 'bg-gray-200 dark:bg-gray-600' : 'bg-blue-100 dark:bg-blue-900'}`}
                       title={widget.hidden ? "Show widget" : "Hide widget"}
+                      aria-label={`${widget.hidden ? 'Show' : 'Hide'} ${widget.title}`}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         {widget.hidden ? (
@@ -285,6 +140,7 @@ const CustomizableDashboard = () => {
                       onClick={() => toggleWidgetSize(widget.id)}
                       className="p-1 rounded-md bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300"
                       title="Change size"
+                      aria-label={`Change size for ${widget.title}`}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -294,6 +150,7 @@ const CustomizableDashboard = () => {
                       onClick={() => openWidgetConfig(widget)}
                       className="p-1 rounded-md bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300"
                       title="Configure widget"
+                      aria-label={`Configure ${widget.title}`}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -304,6 +161,7 @@ const CustomizableDashboard = () => {
                       onClick={() => toggleFavorite(widget.id)}
                       className={`p-1 rounded-md ${widget.favorite ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-600 dark:text-gray-300'}`}
                       title={widget.favorite ? "Remove from favorites" : "Add to favorites"}
+                      aria-label={`${widget.favorite ? 'Remove' : 'Add'} ${widget.title} ${widget.favorite ? 'from' : 'to'} favorites`}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill={widget.favorite ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -313,6 +171,7 @@ const CustomizableDashboard = () => {
                       onClick={() => removeWidget(widget.id)}
                       className="p-1 rounded-md bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
                       title="Remove widget"
+                      aria-label={`Remove ${widget.title}`}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -343,12 +202,20 @@ const CustomizableDashboard = () => {
       {/* Add Widget Modal */}
       {addWidgetModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div
+            ref={addWidgetDialogRef}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="add-widgets-title"
+          >
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Add Widgets</h3>
+              <h3 id="add-widgets-title" className="text-xl font-semibold text-gray-900 dark:text-white">Add Widgets</h3>
               <button
+                type="button"
                 onClick={closeAllModals}
                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                aria-label="Close add widgets dialog"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -358,7 +225,7 @@ const CustomizableDashboard = () => {
             
             <div className="mb-4">
               <div className="flex flex-wrap gap-2 mb-2">
-                {categories.map(category => (
+                {WIDGET_CATEGORIES.map(category => (
                   <button
                     key={category.id}
                     onClick={() => setSelectedCategory(category.id)}
@@ -374,7 +241,12 @@ const CustomizableDashboard = () => {
               </div>
               
               <div className="relative">
+                <label htmlFor="widget-search" className="sr-only">
+                  Search widgets
+                </label>
                 <input
+                  ref={addWidgetSearchRef}
+                  id="widget-search"
                   type="text"
                   placeholder="Search widgets..."
                   value={searchTerm}
@@ -391,7 +263,8 @@ const CustomizableDashboard = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               {filteredWidgets.map(widget => (
-                <div
+                <button
+                  type="button"
                   key={widget.id}
                   className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 bg-white dark:bg-gray-800 cursor-pointer"
                   onClick={() => addWidget(widget)}
@@ -411,7 +284,7 @@ const CustomizableDashboard = () => {
                       {widget.category}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
               
               {filteredWidgets.length === 0 && (
@@ -427,12 +300,20 @@ const CustomizableDashboard = () => {
       {/* Widget Configuration Modal */}
       {widgetConfig && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full">
+          <div
+            ref={widgetConfigDialogRef}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="configure-widget-title"
+          >
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Configure Widget</h3>
+              <h3 id="configure-widget-title" className="text-xl font-semibold text-gray-900 dark:text-white">Configure Widget</h3>
               <button
+                type="button"
                 onClick={() => setWidgetConfig(null)}
                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                aria-label="Close widget configuration dialog"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -445,10 +326,12 @@ const CustomizableDashboard = () => {
               saveWidgetConfig(widgetConfig);
             }}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="widget-config-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Title
                 </label>
                 <input
+                  ref={widgetConfigTitleRef}
+                  id="widget-config-title"
                   type="text"
                   value={widgetConfig.title}
                   onChange={(e) => setWidgetConfig({...widgetConfig, title: e.target.value})}
@@ -457,10 +340,11 @@ const CustomizableDashboard = () => {
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor="widget-config-size" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Size
                 </label>
                 <select
+                  id="widget-config-size"
                   value={widgetConfig.size}
                   onChange={(e) => setWidgetConfig({...widgetConfig, size: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
@@ -567,7 +451,7 @@ const CustomizableDashboard = () => {
           <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Layout Presets</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <button
-              onClick={() => setWidgets(DEFAULT_LAYOUT)}
+              onClick={resetLayout}
               className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 bg-white dark:bg-gray-800"
             >
               <h4 className="font-medium text-gray-900 dark:text-white">Default Layout</h4>
@@ -575,12 +459,15 @@ const CustomizableDashboard = () => {
             </button>
             
             <button
-              onClick={() => {
-                const prFocusedWidgets = ALL_WIDGETS.filter(w => 
-                  ['pr-status', 'pr-review-time', 'pr-size-distribution', 'timeline', 'activity-heatmap'].includes(w.id)
-                );
-                setWidgets(prFocusedWidgets);
-              }}
+              onClick={() =>
+                applyLayoutPreset([
+                  'pr-status',
+                  'pr-review-time',
+                  'pr-size-distribution',
+                  'timeline',
+                  'activity-heatmap',
+                ])
+              }
               className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 bg-white dark:bg-gray-800"
             >
               <h4 className="font-medium text-gray-900 dark:text-white">PR-Focused Layout</h4>
@@ -588,12 +475,15 @@ const CustomizableDashboard = () => {
             </button>
             
             <button
-              onClick={() => {
-                const codeFocusedWidgets = ALL_WIDGETS.filter(w => 
-                  ['activity-heatmap', 'commit-frequency', 'code-churn', 'language-stats', 'commit-calendar'].includes(w.id)
-                );
-                setWidgets(codeFocusedWidgets);
-              }}
+              onClick={() =>
+                applyLayoutPreset([
+                  'activity-heatmap',
+                  'commit-frequency',
+                  'code-churn',
+                  'language-stats',
+                  'commit-calendar',
+                ])
+              }
               className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 bg-white dark:bg-gray-800"
             >
               <h4 className="font-medium text-gray-900 dark:text-white">Code-Focused Layout</h4>

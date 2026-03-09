@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 
-const CommitFrequencyChart = ({ size = 'medium', config = {} }) => {
-  const { contributions, repositories, userEvents, darkMode } = useGithub();
+const CommitFrequencyChart = ({ size = 'medium' }) => {
+  const { contributions, repositories, userEvents } = useGithub();
+  const { darkMode } = useTheme();
   const containerRef = useRef(null);
   const [selectedRepo, setSelectedRepo] = useState('all');
   const [yearOffset, setYearOffset] = useState(0);
@@ -45,63 +47,9 @@ const CommitFrequencyChart = ({ size = 'medium', config = {} }) => {
       }
     }
     
-    // If we have no real data, generate sample data for demonstration
-    generateSampleData();
+    setProcessedCommits([]);
     setLoading(false);
   }, [contributions, userEvents]);
-
-  // Generate realistic sample data when no real data is available
-  const generateSampleData = () => {
-    const sampleCommits = [];
-    const now = new Date();
-    
-    // Generate commits for the past year with realistic patterns
-    for (let i = 0; i < 365; i++) {
-      const date = new Date();
-      date.setDate(now.getDate() - i);
-      
-      // More activity on weekdays, less on weekends
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      
-      // Random factor for natural variations
-      const randomFactor = Math.random();
-      
-      // Seasonal patterns - more activity in certain months
-      const month = date.getMonth();
-      const seasonalFactor = 1 + Math.sin((month / 12) * Math.PI * 2) * 0.3;
-      
-      // Determine commit count
-      let commitCount = 0;
-      
-      if (randomFactor > (isWeekend ? 0.8 : 0.5)) {
-        // Base count affected by seasonal patterns
-        commitCount = Math.floor(randomFactor * seasonalFactor * (isWeekend ? 2 : 5));
-        
-        // Occasional spikes
-        if (randomFactor > 0.95) {
-          commitCount += Math.floor(Math.random() * 10);
-        }
-      }
-      
-      // Add sample commits for this day
-      for (let j = 0; j < commitCount; j++) {
-        const commitDate = new Date(date);
-        commitDate.setHours(Math.floor(Math.random() * 24));
-        
-        sampleCommits.push({
-          sha: `sample-${i}-${j}`,
-          created_at: commitDate.toISOString(),
-          repository: {
-            name: ['main-project', 'utils-lib', 'docs-site'][Math.floor(Math.random() * 3)]
-          },
-          message: 'Sample commit'
-        });
-      }
-    }
-    
-    setProcessedCommits(sampleCommits);
-  };
 
   const renderHeatmap = useCallback((commits) => {
     if (!containerRef.current) return;
@@ -178,7 +126,7 @@ const CommitFrequencyChart = ({ size = 'medium', config = {} }) => {
     });
     
     // Create week groups
-    Object.entries(weeks).forEach(([weekNum, daysInWeek], weekIndex) => {
+    Object.entries(weeks).forEach(([, daysInWeek], weekIndex) => {
       // Create week group
       const weekGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
       weekGroup.setAttribute("transform", `translate(${weekIndex * (cellSize + margin)}, 0)`);

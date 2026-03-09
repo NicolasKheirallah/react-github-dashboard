@@ -1,16 +1,22 @@
 import React, { useMemo } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { applyDashboardScopeFilters } from '../../../utils/dashboardFilters';
+import SafeExternalLink from '../../SafeExternalLink';
 
-const RepositoriesTab = ({ searchQuery, sortOption }) => {
+const RepositoriesTab = ({ searchQuery, sortOption, ownerScope, repoScope, timeRange }) => {
   const { repositories } = useGithub();
   
   // Filter and sort repositories based on search query and sort option
   const filteredAndSortedRepos = useMemo(() => {
     // Filter based on search query
-    let filtered = repositories;
+    let filtered = applyDashboardScopeFilters([...repositories], {
+      ownerScope,
+      repoScope,
+      timeRange,
+    });
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = repositories.filter(repo => 
+      filtered = filtered.filter(repo => 
         repo.name.toLowerCase().includes(query) || 
         (repo.description && repo.description.toLowerCase().includes(query)) ||
         (repo.language && repo.language.toLowerCase().includes(query)) ||
@@ -19,7 +25,7 @@ const RepositoriesTab = ({ searchQuery, sortOption }) => {
     }
     
     // Sort based on sort option
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       switch(sortOption) {
         case 'oldest':
           return new Date(a.created) - new Date(b.created);
@@ -32,7 +38,7 @@ const RepositoriesTab = ({ searchQuery, sortOption }) => {
           return new Date(b.updated) - new Date(a.updated);
       }
     });
-  }, [repositories, searchQuery, sortOption]);
+  }, [ownerScope, repositories, repoScope, searchQuery, sortOption, timeRange]);
   
   // Display message if no results after filtering
   if (filteredAndSortedRepos.length === 0) {
@@ -52,14 +58,12 @@ const RepositoriesTab = ({ searchQuery, sortOption }) => {
           <div className="p-5">
             <div className="flex justify-between items-start">
               <div>
-                <a 
-                  href={repo.url} 
-                  className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:underline" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                <SafeExternalLink
+                  href={repo.url}
+                  className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                 >
                   {repo.name}
-                </a>
+                </SafeExternalLink>
                 <div className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                   {repo.description || "No description available"}
                 </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useGithub } from '../../../context/GithubContext';
 import ForceGraph2D from 'react-force-graph-2d';
 
-const CollaborationNetwork = ({ size = 'medium', config = {} }) => {
+const CollaborationNetwork = ({ size = 'medium' }) => {
   const { pullRequests, issues, userData } = useGithub();
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [highlightNodes, setHighlightNodes] = useState(new Set());

@@ -1,9 +1,25 @@
 import React, { useEffect, useRef } from 'react';
 import { useGithub } from '../../context/GithubContext';
+import { useTheme } from '../../context/ThemeContext';
 import Chart from 'chart.js/auto';
 
-const ChartsSection = () => {
-  const { analytics, darkMode } = useGithub();
+const formatScopeLabel = (repoScope, timeRange) => {
+  const rangeLabel =
+    timeRange === '30d'
+      ? 'Last 30 days'
+      : timeRange === '90d'
+        ? 'Last 90 days'
+        : timeRange === '180d'
+          ? 'Last 180 days'
+          : 'All time';
+
+  return repoScope === 'all' ? `${rangeLabel} across all repositories` : `${rangeLabel} for ${repoScope}`;
+};
+
+const ChartsSection = ({ analytics: scopedAnalytics, repoScope = 'all', timeRange = 'all' }) => {
+  const { analytics: defaultAnalytics } = useGithub();
+  const { darkMode } = useTheme();
+  const analytics = scopedAnalytics || defaultAnalytics;
   
   // Chart references
   const timelineChartRef = useRef(null);
@@ -303,7 +319,12 @@ const ChartsSection = () => {
   return (
     <div className="gh-card mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
       <div className="gh-header p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 rounded-t-lg">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Activity Overview</h2>
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Activity Overview</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            {formatScopeLabel(repoScope, timeRange)}
+          </p>
+        </div>
       </div>
       <div className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">

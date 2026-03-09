@@ -1,7 +1,6 @@
-/* src/index.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+@plugin "@tailwindcss/forms";
 
 :root {
   --color-canvas-default: #ffffff;
@@ -37,6 +36,14 @@
   --color-open-fg: #2ea043;
   --color-closed-fg: #f85149;
   --color-merged-fg: #a371f7;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {

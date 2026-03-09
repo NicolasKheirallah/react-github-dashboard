@@ -1,70 +1,97 @@
-# Getting Started with Create React App
+# GitHub Dashboard
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A client-side GitHub analytics dashboard built with React, Vite, Tailwind CSS v4, Chart.js, and `@dnd-kit`.
 
-## Available Scripts
+## What Changed
 
-In the project directory, you can run:
+- Migrated from Create React App to Vite.
+- Upgraded styling to Tailwind CSS v4.
+- Removed persistent token storage. GitHub tokens now stay in memory only.
+- Rebuilt search, command palette, and settings import/export flows.
+- Deleted unfinished dead modules that were breaking lint/build quality.
+- Added React Query for dashboard and notification data flows.
+- Added runtime error boundary and client observability hooks.
+- Added a Playwright end-to-end test for the primary login-to-dashboard journey.
+- Restored a green `lint` / `build` / `test` baseline.
 
-### `npm start`
+## Security Model
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- This app calls the GitHub API directly from the browser.
+- Personal access tokens are validated and kept in memory for the current session only.
+- Tokens are not written to `localStorage` or `sessionStorage`.
+- Settings import is schema-validated before being applied.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+This is safer than the previous implementation, but it is still a client-only dashboard. A production release should move authentication to a server-backed OAuth flow.
 
-### `npm test`
+## Requirements
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- Node.js 20+ is recommended for Tailwind CSS v4.
+- `npm` 10+ recommended.
 
-### `npm run build`
+## Local Development
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+npm install
+npm run dev
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Open the local Vite URL shown in the terminal.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Scripts
 
-### `npm run eject`
+```bash
+npm run dev
+npm run build
+npm run preview
+npm run lint
+npm test
+npm run test:e2e
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Product Areas
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- Standard dashboard with overview, charts, and tabbed lists
+- Customizable dashboard with draggable widgets
+- Unified search and advanced search page
+- Notification center
+- Theme toggle and settings import/export
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Architecture Notes
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- `src/App.jsx`: app shell, routing, auth session state, settings import/export
+- `src/context/GithubContext.jsx`: shared GitHub data state
+- `src/context/ThemeContext.jsx`: shared theme state
+- `src/lib/queryClient.js`: shared React Query cache policy
+- `src/services/github/*`: GitHub API access split by domain
+- `src/services/dataProcessingService.js`: raw API to UI-model transforms
+- `src/components/dashboard/*`: dashboard views, widgets, charts, and tabs
+- `docs/ARCHITECTURE.md`: current boundaries and next refactor path
 
-## Learn More
+## Deployment and Ops
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- `.github/workflows/ci.yml`: lint, test, build, and production dependency audit
+- `.github/workflows/deploy-pages.yml`: static deployment to GitHub Pages
+- `.github/workflows/preview-artifact.yml`: pull request preview build artifact
+- `.github/dependabot.yml`: weekly dependency update automation
+- `docs/DEPLOYMENT.md`: deployment notes and required headers
+- `docs/ENVIRONMENT.md`: environment and build variables
+- `docs/THREAT_MODEL.md`: current frontend threat model
+- `docs/RELEASE_CHECKLIST.md`: release and rollback checklist
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Verification
 
-### Code Splitting
+The current repo baseline passes:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```bash
+npm run lint
+npm run build
+npm test
+npm run test:e2e
+```
 
-### Analyzing the Bundle Size
+## Known Follow-Ups
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Move auth to a backend OAuth exchange before any real production release.
+- Add a deployed backend or edge function for OAuth token exchange and secret handling.
+- Introduce TypeScript domain contracts at the query/data-processing boundary.
+- Add broader automated coverage for search, notifications, and widget editing flows.

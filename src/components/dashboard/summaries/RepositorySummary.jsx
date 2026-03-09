@@ -1,7 +1,8 @@
 import React from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import SafeExternalLink from '../../SafeExternalLink';
 
-const RepositorySummary = ({ size }) => {
+const RepositorySummary = () => {
   const { repositories } = useGithub();
   
   if (!repositories || repositories.length === 0) {
@@ -65,14 +66,12 @@ const RepositorySummary = ({ size }) => {
             {mostStarredRepo.stars} ★
           </div>
         </div>
-        <a 
-          href={mostStarredRepo.url} 
-          target="_blank" 
-          rel="noopener noreferrer"
+        <SafeExternalLink
+          href={mostStarredRepo.url}
           className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline truncate block"
         >
           {mostStarredRepo.name}
-        </a>
+        </SafeExternalLink>
       </div>
       
       <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 mb-4">
@@ -82,14 +81,12 @@ const RepositorySummary = ({ size }) => {
             {new Date(mostRecentRepo.updated).toLocaleDateString()}
           </div>
         </div>
-        <a 
-          href={mostRecentRepo.url} 
-          target="_blank" 
-          rel="noopener noreferrer"
+        <SafeExternalLink
+          href={mostRecentRepo.url}
           className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline truncate block"
         >
           {mostRecentRepo.name}
-        </a>
+        </SafeExternalLink>
       </div>
       
       <div className="bg-white dark:bg-gray-700 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600">

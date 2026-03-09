@@ -1,9 +1,26 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 import Chart from 'chart.js/auto';
 
+const getIssueLabels = (issue) => {
+  if (Array.isArray(issue.labelNames) && issue.labelNames.length > 0) {
+    return issue.labelNames;
+  }
+
+  if (typeof issue.labels === 'string' && issue.labels.trim()) {
+    return issue.labels
+      .split(',')
+      .map((label) => label.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
 const IssueTypesChart = ({ size = 'medium' }) => {
-  const { issues, darkMode } = useGithub();
+  const { issues } = useGithub();
+  const { darkMode } = useTheme();
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const [chartType, setChartType] = useState('doughnut');
@@ -108,7 +125,9 @@ const IssueTypesChart = ({ size = 'medium' }) => {
           // Process labels
           let hasPriority = false;
           
-          if (!issue.labels || !Array.isArray(issue.labels) || issue.labels.length === 0) {
+          const issueLabels = getIssueLabels(issue);
+
+          if (issueLabels.length === 0) {
             issueTypes['unlabeled']++;
             priorityCounts['none']++;
             return;
@@ -117,10 +136,8 @@ const IssueTypesChart = ({ size = 'medium' }) => {
           // Check if issue has any of our predefined common labels
           let foundCommonLabel = false;
           
-          for (const label of issue.labels) {
-            if (!label || !label.name) continue; // Skip invalid labels
-            
-            const lowercaseName = label.name.toLowerCase();
+          for (const label of issueLabels) {
+            const lowercaseName = label.toLowerCase();
             
             // Check for priority labels
             if (lowercaseName.includes('priority') || lowercaseName.includes('p0') || lowercaseName.includes('p1')) {
@@ -158,51 +175,6 @@ const IssueTypesChart = ({ size = 'medium' }) => {
             priorityCounts['none']++;
           }
         });
-      } else {
-        // Generate realistic sample data if no real issues are available
-        issueTypes['bug'] = 24;
-        issueTypes['feature'] = 16;
-        issueTypes['enhancement'] = 19;
-        issueTypes['documentation'] = 8;
-        issueTypes['question'] = 12;
-        issueTypes['help wanted'] = 5;
-        issueTypes['good first issue'] = 7;
-        issueTypes['unlabeled'] = 14;
-        issueTypes['other'] = 10;
-        
-        statusCounts['open'] = 38;
-        statusCounts['closed'] = 77;
-        
-        priorityCounts['high'] = 21;
-        priorityCounts['medium'] = 42;
-        priorityCounts['low'] = 18;
-        priorityCounts['none'] = 34;
-        
-        // Generate sample monthly data
-        const monthKeys = Object.keys(monthlyIssues).sort();
-        monthKeys.forEach((key, index) => {
-          // Create realistic decreasing pattern
-          const baseFactor = index === 0 ? 1 : (6 - index) / 5;
-          monthlyIssues[key].created = Math.floor(15 * baseFactor + Math.random() * 10);
-          monthlyIssues[key].closed = Math.floor(13 * baseFactor + Math.random() * 8);
-        });
-        
-        // Generate sample resolution times
-        for (let i = 0; i < 115; i++) {
-          // Realistic distribution - most issues resolved within a few days, some taking longer
-          let time;
-          const rand = Math.random();
-          if (rand < 0.5) {
-            time = Math.random() * 3; // 0-3 days
-          } else if (rand < 0.8) {
-            time = 3 + Math.random() * 7; // 3-10 days
-          } else if (rand < 0.95) {
-            time = 10 + Math.random() * 20; // 10-30 days
-          } else {
-            time = 30 + Math.random() * 70; // 30-100 days
-          }
-          resolutionTimes.push(time);
-        }
       }
 
       // Remove categories with 0 values for the type distribution
@@ -216,13 +188,8 @@ const IssueTypesChart = ({ size = 'medium' }) => {
         }
       });
       
-      // If we have no data, return some sample data
       if (!hasData) {
-        filteredTypes['bug'] = 24;
-        filteredTypes['feature'] = 16;
-        filteredTypes['enhancement'] = 19;
-        filteredTypes['documentation'] = 8;
-        filteredTypes['unlabeled'] = 14;
+        return null;
       }
       
       // Process resolution time data into bins
@@ -302,17 +269,97 @@ const IssueTypesChart = ({ size = 'medium' }) => {
     setLoading(false);
   }, [issues, timeFilter]);
 
+  const createTrendChart = useCallback(() => {
+    if (!chartRef.current || !issueData || !issueData.monthly) return;
+    
+    // Destroy existing chart if it exists
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+    }
+    
+    const isDarkMode = darkMode;
+    const textColor = isDarkMode ? '#c9d1d9' : '#24292f';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    
+    const ctx = chartRef.current.getContext('2d');
+    chartInstance.current = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: issueData.monthly.labels,
+        datasets: [
+          {
+            label: 'Created',
+            data: issueData.monthly.created,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.2)',
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2
+          },
+          {
+            label: 'Closed',
+            data: issueData.monthly.closed,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.2)',
+            fill: true,
+            tension: 0.4,
+            borderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: gridColor
+            },
+            ticks: {
+              color: textColor
+            }
+          },
+          x: {
+            grid: {
+              color: gridColor
+            },
+            ticks: {
+              color: textColor
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: textColor,
+              font: { size: 12 }
+            }
+          },
+          title: {
+            display: true,
+            text: 'Issue Trends (6 Months)',
+            color: textColor,
+            font: {
+              size: 16,
+              weight: 'bold'
+            }
+          }
+        }
+      }
+    });
+  }, [darkMode, issueData]);
+
   useEffect(() => {
     if (!chartRef.current || !issueData || loading) {
       return;
     }
 
-    // Destroy existing chart if it exists
     if (chartInstance.current) {
       chartInstance.current.destroy();
     }
 
-    // Get dataset based on active tab
     let chartData;
     let chartTitle;
     
@@ -330,24 +377,19 @@ const IssueTypesChart = ({ size = 'medium' }) => {
         chartTitle = 'Resolution Time';
         break;
       case 'trends':
-        // For trends, we'll create a special line chart
         createTrendChart();
-        return; // Skip the rest of this function
+        return;
       case 'distribution':
       default:
         chartData = issueData.types;
         chartTitle = 'Issue Types Breakdown';
     }
 
-    // Chart theme
     const isDarkMode = darkMode;
     const textColor = isDarkMode ? '#c9d1d9' : '#24292f';
     const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-
-    // Create the chart
     const ctx = chartRef.current.getContext('2d');
     
-    // Chart configuration based on selected chart type
     const config = {
       type: chartType,
       data: {
@@ -429,9 +471,8 @@ const IssueTypesChart = ({ size = 'medium' }) => {
       }
     };
     
-    // Additional configuration for bar chart
     if (chartType === 'bar') {
-      config.options.indexAxis = 'y'; // Horizontal bar chart
+      config.options.indexAxis = 'y';
       config.options.scales = {
         x: {
           beginAtZero: true,
@@ -459,96 +500,12 @@ const IssueTypesChart = ({ size = 'medium' }) => {
       console.error('Error creating chart:', error);
     }
 
-    // Cleanup
     return () => {
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
     };
-  }, [issueData, darkMode, chartType, loading, activeTab]);
-
-  // Special function to create trend chart
-  const createTrendChart = () => {
-    if (!chartRef.current || !issueData || !issueData.monthly) return;
-    
-    // Destroy existing chart if it exists
-    if (chartInstance.current) {
-      chartInstance.current.destroy();
-    }
-    
-    const isDarkMode = darkMode;
-    const textColor = isDarkMode ? '#c9d1d9' : '#24292f';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-    
-    const ctx = chartRef.current.getContext('2d');
-    chartInstance.current = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: issueData.monthly.labels,
-        datasets: [
-          {
-            label: 'Created',
-            data: issueData.monthly.created,
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-            fill: true,
-            tension: 0.4,
-            borderWidth: 2
-          },
-          {
-            label: 'Closed',
-            data: issueData.monthly.closed,
-            borderColor: '#10b981',
-            backgroundColor: 'rgba(16, 185, 129, 0.2)',
-            fill: true,
-            tension: 0.4,
-            borderWidth: 2
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            grid: {
-              color: gridColor
-            },
-            ticks: {
-              color: textColor
-            }
-          },
-          x: {
-            grid: {
-              color: gridColor
-            },
-            ticks: {
-              color: textColor
-            }
-          }
-        },
-        plugins: {
-          legend: {
-            position: 'top',
-            labels: {
-              color: textColor,
-              font: { size: 12 }
-            }
-          },
-          title: {
-            display: true,
-            text: 'Issue Trends (6 Months)',
-            color: textColor,
-            font: {
-              size: 16,
-              weight: 'bold'
-            }
-          }
-        }
-      }
-    });
-  };
+  }, [activeTab, chartType, createTrendChart, darkMode, issueData, loading]);
 
   const getChartHeight = () => {
     switch (size) {
@@ -671,8 +628,12 @@ const IssueTypesChart = ({ size = 'medium' }) => {
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
           </div>
-        ) : (
+        ) : issueData ? (
           <canvas ref={chartRef}></canvas>
+        ) : (
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Issue analytics require real issue and label data from GitHub.
+          </div>
         )}
       </div>
       

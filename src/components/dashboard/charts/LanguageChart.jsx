@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 import Chart from 'chart.js/auto';
 
 const LanguageChart = ({ size = 'medium' }) => {
-  const { repositories, darkMode } = useGithub();
+  const { repositories } = useGithub();
+  const { darkMode } = useTheme();
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const [languageData, setLanguageData] = useState(null);

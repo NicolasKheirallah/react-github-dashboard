@@ -1,16 +1,22 @@
 import React, { useMemo } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { applyDashboardScopeFilters } from '../../../utils/dashboardFilters';
+import SafeExternalLink from '../../SafeExternalLink';
 
-const PullRequestsTab = ({ searchQuery, sortOption }) => {
+const PullRequestsTab = ({ searchQuery, sortOption, ownerScope, repoScope, timeRange }) => {
   const { pullRequests } = useGithub();
   
   // Filter and sort pull requests based on search query and sort option
   const filteredAndSortedPRs = useMemo(() => {
     // Filter based on search query
-    let filtered = pullRequests;
+    let filtered = applyDashboardScopeFilters([...pullRequests], {
+      ownerScope,
+      repoScope,
+      timeRange,
+    });
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = pullRequests.filter(pr => 
+      filtered = filtered.filter(pr => 
         pr.title.toLowerCase().includes(query) || 
         pr.repository.toLowerCase().includes(query) ||
         (pr.labels && pr.labels.toLowerCase().includes(query))
@@ -18,7 +24,7 @@ const PullRequestsTab = ({ searchQuery, sortOption }) => {
     }
     
     // Sort based on sort option
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       switch(sortOption) {
         case 'oldest':
           return new Date(a.createdDateTime) - new Date(b.createdDateTime);
@@ -31,7 +37,7 @@ const PullRequestsTab = ({ searchQuery, sortOption }) => {
           return new Date(b.createdDateTime) - new Date(a.createdDateTime);
       }
     });
-  }, [pullRequests, searchQuery, sortOption]);
+  }, [ownerScope, pullRequests, repoScope, searchQuery, sortOption, timeRange]);
   
   // Display message if no results after filtering
   if (filteredAndSortedPRs.length === 0) {
@@ -61,14 +67,12 @@ const PullRequestsTab = ({ searchQuery, sortOption }) => {
           {filteredAndSortedPRs.map(pr => (
             <tr key={`${pr.repository}-${pr.number}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
               <td className="px-4 py-4 whitespace-nowrap">
-                <a 
-                  href={pr.url} 
-                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                <SafeExternalLink
+                  href={pr.url}
+                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                 >
                   #{pr.number}
-                </a>
+                </SafeExternalLink>
               </td>
               <td className="px-4 py-4 whitespace-nowrap">
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{pr.repository}</div>
@@ -79,13 +83,13 @@ const PullRequestsTab = ({ searchQuery, sortOption }) => {
               </td>
               <td className="px-4 py-4 whitespace-nowrap">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  pr.state === 'Open' 
+                  pr.state === 'open' 
                     ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' 
-                    : pr.state === 'Merged'
+                    : pr.state === 'merged'
                       ? 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
                       : 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                 }`}>
-                  {pr.state}
+                  {pr.stateLabel || pr.state}
                 </span>
               </td>
               <td className="px-4 py-4 whitespace-nowrap">

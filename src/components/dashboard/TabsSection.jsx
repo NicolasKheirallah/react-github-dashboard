@@ -14,36 +14,47 @@ const TabsSection = ({
   searchQuery, 
   onSearchChange,
   sortOption,
-  onSortChange
+  onSortChange,
+  ownerScope,
+  ownerOptions = [],
+  onOwnerScopeChange,
+  repoScope,
+  onRepoScopeChange,
+  timeRange,
+  onTimeRangeChange,
+  scopedData,
 }) => {
   const { 
-    pullRequests, 
-    issues, 
     repositories, 
-    organizations, 
-    starredRepos 
+    organizations
   } = useGithub();
+  const scopedPullRequests = scopedData?.pullRequests ?? [];
+  const scopedIssues = scopedData?.issues ?? [];
+  const scopedRepositories = scopedData?.repositories ?? [];
+  const scopedStarredRepos = scopedData?.starredRepos ?? [];
+  const repositoryFilterOptions =
+    scopedRepositories.length > 0 || repoScope !== 'all' ? scopedRepositories : repositories;
   
   const tabs = [
-    { id: 'pull-requests', label: 'Pull Requests', count: pullRequests.length },
-    { id: 'issues', label: 'Issues', count: issues.length },
-    { id: 'repositories', label: 'Repositories', count: repositories.length },
+    { id: 'pull-requests', label: 'Pull Requests', count: scopedPullRequests.length },
+    { id: 'issues', label: 'Issues', count: scopedIssues.length },
+    { id: 'repositories', label: 'Repositories', count: scopedRepositories.length },
     { id: 'organizations', label: 'Organizations', count: organizations.length },
-    { id: 'starred', label: 'Starred', count: starredRepos.length },
+    { id: 'starred', label: 'Starred', count: scopedStarredRepos.length },
   ];
   
   const renderTabContent = () => {
     switch(activeTab) {
       case 'pull-requests':
-        return <PullRequestsTab searchQuery={searchQuery} sortOption={sortOption} />;
+        return <PullRequestsTab searchQuery={searchQuery} sortOption={sortOption} ownerScope={ownerScope} repoScope={repoScope} timeRange={timeRange} />;
       case 'issues':
-        return <IssuesTab searchQuery={searchQuery} sortOption={sortOption} />;
+        return <IssuesTab searchQuery={searchQuery} sortOption={sortOption} ownerScope={ownerScope} repoScope={repoScope} timeRange={timeRange} />;
       case 'repositories':
-        return <RepositoriesTab searchQuery={searchQuery} sortOption={sortOption} />;
+        return <RepositoriesTab searchQuery={searchQuery} sortOption={sortOption} ownerScope={ownerScope} repoScope={repoScope} timeRange={timeRange} />;
       case 'organizations':
-        return <OrganizationsTab searchQuery={searchQuery} sortOption={sortOption} />;
+        return <OrganizationsTab searchQuery={searchQuery} sortOption={sortOption} ownerScope={ownerScope} repoScope={repoScope} timeRange={timeRange} />;
       case 'starred':
-        return <StarredTab searchQuery={searchQuery} sortOption={sortOption} />;
+        return <StarredTab searchQuery={searchQuery} sortOption={sortOption} ownerScope={ownerScope} repoScope={repoScope} timeRange={timeRange} />;
       default:
         return <div>Select a tab to view content</div>;
     }
@@ -75,7 +86,44 @@ const TabsSection = ({
           </ul>
           
           {/* Sort & Filter Options */}
-          <div className="ml-auto flex items-center space-x-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <select
+              value={ownerScope}
+              onChange={onOwnerScopeChange}
+              className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Filter by owner scope"
+            >
+              <option value="all">All Owners</option>
+              {ownerOptions.map((owner) => (
+                <option key={owner} value={owner}>
+                  {owner}
+                </option>
+              ))}
+            </select>
+            <select
+              value={repoScope}
+              onChange={onRepoScopeChange}
+              className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Filter by repository scope"
+            >
+              <option value="all">All Repositories</option>
+              {repositoryFilterOptions.slice(0, 40).map((repo) => (
+                <option key={repo.name} value={repo.name}>
+                  {repo.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={timeRange}
+              onChange={onTimeRangeChange}
+              className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="Filter by time range"
+            >
+              <option value="all">All Time</option>
+              <option value="30d">Last 30 Days</option>
+              <option value="90d">Last 90 Days</option>
+              <option value="180d">Last 180 Days</option>
+            </select>
             <select 
               id="sortOptions" 
               value={sortOption}

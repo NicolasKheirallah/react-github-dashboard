@@ -1,360 +1,332 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useGithub } from '../context/GithubContext';
+import { openExternalUrl } from '../utils/externalLinks';
+import {
+  buildSearchItems,
+  filterSearchItems,
+  getSearchLanguages,
+  groupSearchItems,
+  parseSearchQuery,
+  sortSearchItems,
+} from '../utils/search';
+
+const CATEGORY_OPTIONS = [
+  { id: 'all', name: 'All Results' },
+  { id: 'repositories', name: 'Repositories' },
+  { id: 'pull-requests', name: 'Pull Requests' },
+  { id: 'issues', name: 'Issues' },
+  { id: 'organizations', name: 'Organizations' },
+  { id: 'starred', name: 'Starred Repos' },
+];
+
+const SORT_OPTIONS = [
+  { id: 'relevance', name: 'Best Match' },
+  { id: 'newest', name: 'Most Recent' },
+  { id: 'oldest', name: 'Oldest First' },
+  { id: 'stars', name: 'Most Stars' },
+  { id: 'activity', name: 'Most Active' },
+];
+
+const GROUP_OPTIONS = [
+  { id: 'none', name: 'No Grouping' },
+  { id: 'repository', name: 'By Repository' },
+  { id: 'type', name: 'By Type' },
+  { id: 'language', name: 'By Language' },
+];
+
+const getStateBadgeClasses = (state) => {
+  switch (state) {
+    case 'open':
+      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+    case 'merged':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+    default:
+      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+  }
+};
+
+const renderIcon = (type) => {
+  const commonProps = {
+    className: 'h-5 w-5',
+    xmlns: 'http://www.w3.org/2000/svg',
+    viewBox: '0 0 20 20',
+    fill: 'currentColor',
+  };
+
+  switch (type) {
+    case 'repositories':
+    case 'starred':
+      return (
+        <svg {...commonProps} className="h-5 w-5 text-blue-500">
+          <path
+            fillRule="evenodd"
+            d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414z"
+            clipRule="evenodd"
+          />
+        </svg>
+      );
+    case 'pull-requests':
+      return (
+        <svg {...commonProps} className="h-5 w-5 text-purple-500">
+          <path
+            fillRule="evenodd"
+            d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm9 4a1 1 0 10-2 0v6a1 1 0 102 0V7zm-3 2a1 1 0 10-2 0v4a1 1 0 102 0V9zm-3 3a1 1 0 10-2 0v1a1 1 0 102 0v-1z"
+            clipRule="evenodd"
+          />
+        </svg>
+      );
+    case 'issues':
+      return (
+        <svg {...commonProps} className="h-5 w-5 text-green-500">
+          <path
+            fillRule="evenodd"
+            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+            clipRule="evenodd"
+          />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...commonProps} className="h-5 w-5 text-orange-500">
+          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+        </svg>
+      );
+  }
+};
 
 const SearchResults = ({ query, filters = [], onItemClick }) => {
-  const [rawResults, setRawResults] = useState([]);
-  const [resultStats, setResultStats] = useState({});
-  const [loading, setLoading] = useState(false);
-
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedLanguage, setSelectedLanguage] = useState('all');
   const [sortBy, setSortBy] = useState('relevance');
   const [groupBy, setGroupBy] = useState('none');
-  const [expandedItems, setExpandedItems] = useState({});
-
   const {
     repositories,
     pullRequests,
     issues,
     organizations,
     starredRepos,
-    userData
+    userData,
   } = useGithub();
 
-  // Available filters
-  const categories = [
-    { id: 'all', name: 'All Results' },
-    { id: 'repositories', name: 'Repositories' },
-    { id: 'pull-requests', name: 'Pull Requests' },
-    { id: 'issues', name: 'Issues' },
-    { id: 'code', name: 'Code' },
-    { id: 'organizations', name: 'Organizations' }
-  ];
-  const sortOptions = [
-    { id: 'relevance', name: 'Best Match' },
-    { id: 'newest',    name: 'Most Recent' },
-    { id: 'oldest',    name: 'Oldest First' },
-    { id: 'stars',     name: 'Most Stars' },
-    { id: 'activity',  name: 'Most Active' }
-  ];
-  const groupOptions = [
-    { id: 'none',       name: 'No Grouping' },
-    { id: 'repository', name: 'By Repository' },
-    { id: 'type',       name: 'By Type' },
-    { id: 'owner',      name: 'By Owner' },
-    { id: 'language',   name: 'By Language' }
-  ];
+  const queryParts = useMemo(() => parseSearchQuery(query), [query]);
 
-  // toggle expansion of PR/issue details
-  const toggleItemExpansion = id => {
-    setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
-  // generic field-based filter
-  const applyFilters = (item, conditions) => {
-    if (!conditions?.length) return true;
-    return conditions.every(({ field, operator, value }) => {
-      const v = item[field];
-      if (v == null) return true;
-      switch (operator) {
-        case 'contains': return String(v).toLowerCase().includes(String(value).toLowerCase());
-        case 'eq':       return v === value;
-        case 'gt':       return Number(v) > Number(value);
-        case 'lt':       return Number(v) < Number(value);
-        case 'before':   return new Date(v) < new Date(value);
-        case 'after':    return new Date(v) > new Date(value);
-        default:         return true;
+  const rawResults = useMemo(() => {
+    return filterSearchItems(
+      buildSearchItems({
+        repositories,
+        pullRequests,
+        issues,
+        organizations,
+        starredRepos,
+      }),
+      {
+        queryParts,
+        filters,
+        userLogin: userData?.login,
       }
-    });
-  };
+    );
+  }, [
+    filters,
+    issues,
+    organizations,
+    pullRequests,
+    queryParts,
+    repositories,
+    starredRepos,
+    userData?.login,
+  ]);
 
-  // relevance scoring
-  const calculateRelevance = (item, q) => {
-    if (!q) return 1;
-    let score = 0;
-    const t = item.title?.toLowerCase() || '';
-    if (t.includes(q)) score += 10;
-    if (t === q)       score += 5;
-    if (t.startsWith(q)) score += 3;
-    if (item.description?.toLowerCase().includes(q)) score += 5;
-    if (item.language?.toLowerCase().includes(q)) score += 3;
-    if (item.stars)    score += Math.min(item.stars / 100, 5);
-    if (item.updated) {
-      const days = (Date.now() - new Date(item.updated)) / 86400000;
-      score += Math.max(0, 3 - days / 30);
-    }
-    return score;
-  };
-
-  // sorting
-  const sortResults = (list, option) => {
-    return [...list].sort((a, b) => {
-      switch (option) {
-        case 'relevance': return b.relevanceScore - a.relevanceScore;
-        case 'newest':    return new Date(b.updated || 0) - new Date(a.updated || 0);
-        case 'oldest':    return new Date(a.updated || 0) - new Date(b.updated || 0);
-        case 'stars':     return (b.stars || 0) - (a.stars || 0);
-        case 'activity':  return ((b.stars||0)+(b.forks||0)*2) - ((a.stars||0)+(a.forks||0)*2);
-        default:          return 0;
+  const resultStats = useMemo(() => {
+    return rawResults.reduce(
+      (stats, item) => {
+        stats.total += 1;
+        stats[item.type] = (stats[item.type] || 0) + 1;
+        return stats;
+      },
+      {
+        total: 0,
+        repositories: 0,
+        'pull-requests': 0,
+        issues: 0,
+        organizations: 0,
+        starred: 0,
       }
-    });
-  };
-
-  // grouping
-  const groupResults = (list, option) => {
-    if (option === 'none') return list;
-    const groups = {};
-    list.forEach(item => {
-      const key =
-        option === 'repository' ? item.repository :
-        option === 'type'       ? item.type :
-        option === 'owner'      ? item.owner || userData?.login :
-        option === 'language'   ? item.language :
-        'Other';
-      (groups[key] ||= []).push(item);
-    });
-    return Object.entries(groups).flatMap(([name, items]) => [
-      { id: `group-${name}`, isGroupHeader: true, groupName: name, count: items.length },
-      ...items
-    ]);
-  };
-
-  // icon/render helpers (same as before)
-  const renderIcon = type => {/* ... */}
-  const renderStateLabel = state => {/* ... */}
-
-  // perform search across all types
-  const performSearch = useCallback((searchQuery, filterConditions) => {
-    const q = searchQuery.toLowerCase().trim();
-    let all = [];
-    const stats = { total: 0, repositories: 0, 'pull-requests': 0, issues: 0, code: 0, organizations: 0 };
-
-    // repositories
-    if (repositories?.length) {
-      const repos = repositories
-        .filter(r => (
-          (!q || r.name.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q))
-          && applyFilters(r, filterConditions)
-        ))
-        .map(r => ({
-          id: `repo-${r.name}`,
-          type: 'repositories',
-          title: r.name,
-          description: r.description || 'No description',
-          url: r.url,
-          repository: r.name,
-          language: r.language,
-          stars: r.stars,
-          forks: r.forks,
-          updated: r.updated,
-          isPrivate: r.isPrivate,
-          relevanceScore: calculateRelevance(r, q)
-        }));
-      all = all.concat(repos);
-      stats.repositories = repos.length;
-    }
-
-    // [ repeat similar blocks for pullRequests, issues, organizations... ]
-
-    stats.total = all.length;
-    return { results: all, stats };
-  }, [repositories, pullRequests, issues, organizations, starredRepos]);
-
-  // run search when query/filters change
-  useEffect(() => {
-    if (!query && filters.length === 0) {
-      setRawResults([]);
-      setResultStats({});
-      return;
-    }
-    setLoading(true);
-    const id = setTimeout(() => {
-      const { results, stats } = performSearch(query, filters);
-      setRawResults(results);
-      setResultStats(stats);
-      setLoading(false);
-    }, 300);
-    return () => clearTimeout(id);
-  }, [query, filters, performSearch]);
-
-  // derive unique languages for dropdown
-  const languages = useMemo(() => {
-    const langs = rawResults.map(i => i.language).filter(Boolean);
-    return ['all', ...Array.from(new Set(langs))];
+    );
   }, [rawResults]);
 
-  // apply category, language, sort, group
-  const displayedResults = useMemo(() => {
-    let list = rawResults;
-    if (activeCategory !== 'all') {
-      list = list.filter(i => i.type === activeCategory);
-    }
-    if (selectedLanguage !== 'all') {
-      list = list.filter(i => i.language === selectedLanguage);
-    }
-    list = sortResults(list, sortBy);
-    list = groupResults(list, groupBy);
-    return list;
-  }, [rawResults, activeCategory, selectedLanguage, sortBy, groupBy]);
+  const languages = useMemo(() => {
+    return getSearchLanguages(rawResults);
+  }, [rawResults]);
 
-  // render empty state
+  const displayedResults = useMemo(() => {
+    let results = [...rawResults];
+
+    if (activeCategory !== 'all') {
+      results = results.filter((item) => item.type === activeCategory);
+    }
+
+    if (selectedLanguage !== 'all') {
+      results = results.filter((item) => item.language === selectedLanguage);
+    }
+
+    results = sortSearchItems(results, sortBy);
+
+    if (groupBy === 'none') {
+      return results;
+    }
+
+    return groupSearchItems(results, groupBy);
+  }, [activeCategory, groupBy, rawResults, selectedLanguage, sortBy]);
+
+  const openResult = (item) => {
+    if (onItemClick) {
+      onItemClick(item);
+      return;
+    }
+
+    if (item.url) {
+      openExternalUrl(item.url);
+    }
+  };
+
   if (!query && filters.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
-        <p className="text-gray-500">Start searching</p>
+      <div className="rounded-lg bg-white p-8 text-center shadow-md dark:bg-gray-800">
+        <p className="text-gray-500 dark:text-gray-400">Start searching your GitHub data.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center justify-between">
+    <div className="overflow-hidden rounded-lg bg-white shadow-md dark:bg-gray-800">
+      <div className="flex flex-col justify-between gap-4 border-b border-gray-200 px-4 py-4 dark:border-gray-700 sm:flex-row sm:items-center">
         <h2 className="text-lg font-medium text-gray-900 dark:text-white">
-          {loading ? 'Searching…' : `${resultStats.total || 0} results`}
-          {query && !loading && (
-            <span className="ml-1 text-gray-600 dark:text-gray-400 text-base">
-              for “{query}”
+          {resultStats.total} results
+          {query && (
+            <span className="ml-1 text-base text-gray-600 dark:text-gray-400">
+              for &ldquo;{query}&rdquo;
             </span>
           )}
         </h2>
-        <div className="mt-2 sm:mt-0 flex flex-wrap gap-2">
-          {/* Category */}
+        <div className="flex flex-wrap gap-2">
           <select
             value={activeCategory}
-            onChange={e => setActiveCategory(e.target.value)}
-            className="text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-1 px-3"
+            onChange={(event) => setActiveCategory(event.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
+            aria-label="Filter results by category"
           >
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name}{resultStats[c.id] ? ` (${resultStats[c.id]})` : ''}
+            {CATEGORY_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+                {option.id !== 'all' ? ` (${resultStats[option.id] || 0})` : ''}
               </option>
             ))}
           </select>
-          {/* Language */}
           <select
             value={selectedLanguage}
-            onChange={e => setSelectedLanguage(e.target.value)}
-            className="text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-1 px-3"
+            onChange={(event) => setSelectedLanguage(event.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
+            aria-label="Filter results by language"
           >
-            {languages.map(lang => (
-              <option key={lang} value={lang}>
-                {lang === 'all' ? 'All Languages' : lang}
+            {languages.map((language) => (
+              <option key={language} value={language}>
+                {language === 'all' ? 'All Languages' : language}
               </option>
             ))}
           </select>
-          {/* Sort */}
           <select
             value={sortBy}
-            onChange={e => setSortBy(e.target.value)}
-            className="text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-1 px-3"
+            onChange={(event) => setSortBy(event.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
+            aria-label="Sort results"
           >
-            {sortOptions.map(o => (
-              <option key={o.id} value={o.id}>{o.name}</option>
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
             ))}
           </select>
-          {/* Group */}
           <select
             value={groupBy}
-            onChange={e => setGroupBy(e.target.value)}
-            className="text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md py-1 px-3"
+            onChange={(event) => setGroupBy(event.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm dark:border-gray-600 dark:bg-gray-700"
+            aria-label="Group results"
           >
-            {groupOptions.map(o => (
-              <option key={o.id} value={o.id}>{o.name}</option>
+            {GROUP_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Results */}
-      <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-[60vh] overflow-y-auto">
-        {loading ? (
-          <div className="py-8 flex justify-center">
-            {/* spinner… */}
-          </div>
-        ) : displayedResults.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            No results{query ? ` for “${query}”` : ''}
+      <div className="max-h-[60vh] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
+        {displayedResults.length === 0 ? (
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            No results found{query ? ` for “${query}”` : ''}.
           </div>
         ) : (
           <ul>
-            {displayedResults.map(item =>
+            {displayedResults.map((item) =>
               item.isGroupHeader ? (
                 <li
                   key={item.id}
-                  className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 font-medium text-gray-700 dark:text-gray-300"
+                  className="bg-gray-50 px-4 py-3 font-medium text-gray-700 dark:bg-gray-700/50 dark:text-gray-300"
                 >
                   {item.groupName} ({item.count})
                 </li>
               ) : (
                 <li key={item.id}>
-                  <div
-                    className="px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer flex items-start"
-                    onClick={() => onItemClick?.(item)}
+                  <button
+                    type="button"
+                    className="flex w-full items-start px-4 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-gray-700"
+                    onClick={() => openResult(item)}
                   >
-                    <div className="flex-shrink-0 mt-1">
-                      {renderIcon(item.type)}
-                    </div>
+                    <div className="mt-1 flex-shrink-0">{renderIcon(item.type)}</div>
                     <div className="ml-3 flex-1">
-                      <div className="flex items-center space-x-2">
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                          onClick={e => e.stopPropagation()}
-                        >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                           {item.title}
-                        </a>
-                        {item.state && renderStateLabel(item.state)}
-                        {item.isPrivate && (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300">
+                        </span>
+                        {item.state && (
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${getStateBadgeClasses(
+                              item.state
+                            )}`}
+                          >
+                            {item.state.charAt(0).toUpperCase() + item.state.slice(1)}
+                          </span>
+                        )}
+                        {item.private && (
+                          <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800 dark:bg-gray-700 dark:text-gray-300">
                             Private
                           </span>
                         )}
                       </div>
 
                       {item.description && (
-                        <p className="mt-1 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
+                        <p className="mt-1 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
                           {item.description}
                         </p>
                       )}
 
-                      <div className="mt-2 flex flex-wrap items-center text-xs text-gray-500 dark:text-gray-400 space-x-3">
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
                         {item.language && (
-                          <div className="flex items-center">
-                            <span className="h-3 w-3 rounded-full bg-blue-500 mr-1" />
-                            <span>{item.language}</span>
-                          </div>
+                          <span className="flex items-center gap-1">
+                            <span className="h-3 w-3 rounded-full bg-blue-500" />
+                            {item.language}
+                          </span>
                         )}
-                        {typeof item.stars === 'number' && (
-                          <div className="flex items-center">⭐ {item.stars}</div>
-                        )}
-                        {typeof item.forks === 'number' && (
-                          <div className="flex items-center">🍴 {item.forks}</div>
-                        )}
+                        {typeof item.stars === 'number' && <span>Stars: {item.stars}</span>}
+                        {typeof item.forks === 'number' && <span>Forks: {item.forks}</span>}
                         {item.updated && (
-                          <div>
-                            Updated {new Date(item.updated).toLocaleDateString()}
-                          </div>
+                          <span>Updated {new Date(item.updated).toLocaleDateString()}</span>
                         )}
-                        {item.repository && (
-                          <div>
-                            in{' '}
-                            <a
-                              href={`https://github.com/${item.repository}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 dark:text-blue-400 hover:underline"
-                              onClick={e => e.stopPropagation()}
-                            >
-                              {item.repository}
-                            </a>
-                          </div>
-                        )}
+                        {item.repository && <span>in {item.repository}</span>}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 </li>
               )
             )}

@@ -1,17 +1,21 @@
 // src/components/dashboard/tabs/OrganizationsTab.jsx
 import React, { useMemo } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import SafeExternalLink from '../../SafeExternalLink';
 
-const OrganizationsTab = ({ searchQuery, sortOption }) => {
+const OrganizationsTab = ({ searchQuery, sortOption, ownerScope = 'all' }) => {
   const { organizations } = useGithub();
   
   // Filter and sort organizations based on search query and sort option
   const filteredAndSortedOrgs = useMemo(() => {
     // Filter based on search query
-    let filtered = organizations;
+    let filtered = [...organizations];
+    if (ownerScope !== 'all') {
+      filtered = filtered.filter((org) => org.login === ownerScope);
+    }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = organizations.filter(org => 
+      filtered = filtered.filter(org => 
         org.login.toLowerCase().includes(query) || 
         org.name.toLowerCase().includes(query) ||
         (org.description && org.description.toLowerCase().includes(query))
@@ -19,7 +23,7 @@ const OrganizationsTab = ({ searchQuery, sortOption }) => {
     }
     
     // Sort based on sort option
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       switch(sortOption) {
         case 'az':
           return a.name.localeCompare(b.name);
@@ -33,7 +37,7 @@ const OrganizationsTab = ({ searchQuery, sortOption }) => {
           return a.login.localeCompare(b.login);
       }
     });
-  }, [organizations, searchQuery, sortOption]);
+  }, [organizations, ownerScope, searchQuery, sortOption]);
   
   // Display message if no results after filtering
   if (filteredAndSortedOrgs.length === 0) {
@@ -57,14 +61,12 @@ const OrganizationsTab = ({ searchQuery, sortOption }) => {
               className="w-12 h-12 rounded-full flex-shrink-0 border border-gray-200 dark:border-gray-700"
             />
             <div className="min-w-0 flex-1">
-              <a 
-                href={org.url} 
-                className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:underline truncate block" 
-                target="_blank" 
-                rel="noopener noreferrer"
+              <SafeExternalLink
+                href={org.url}
+                className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:underline truncate block"
               >
                 {org.name || org.login}
-              </a>
+              </SafeExternalLink>
               <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">@{org.login}</div>
               {org.description && (
                 <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-2">

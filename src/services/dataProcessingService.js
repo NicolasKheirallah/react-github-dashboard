@@ -15,20 +15,29 @@ export const processPullRequests = (pullRequests) => {
       const createdDate = new Date(pr.created_at);
       const closedDate = pr.closed_at ? new Date(pr.closed_at) : null;
       const daysOpen = getDaysBetween(createdDate, closedDate || new Date());
-      const state = pr.pull_request?.merged_at ? 'Merged' : pr.state === 'closed' ? 'Closed' : 'Open';
+      const state = pr.pull_request?.merged_at
+        ? 'merged'
+        : pr.state === 'closed'
+          ? 'closed'
+          : 'open';
 
       return {
         number: pr.number,
         repository: repoName,
         title: pr.title,
         state,
+        stateLabel: state.charAt(0).toUpperCase() + state.slice(1),
         daysOpen: parseFloat(daysOpen),
         created: createdDate.toISOString().split('T')[0],
         createdDateTime: createdDate,
         hourCreated: createdDate.getHours(),
         updated: new Date(pr.updated_at).toISOString().split('T')[0],
         closedDateTime: closedDate,
+        created_at: pr.created_at,
+        closed_at: pr.closed_at,
         labels: safeGetLabels(pr.labels),
+        additions: typeof pr.additions === 'number' ? pr.additions : null,
+        deletions: typeof pr.deletions === 'number' ? pr.deletions : null,
         comments: pr.comments,
         url: pr.html_url,
         dayOfWeek: weekdayFormatter.format(createdDate),
@@ -63,7 +72,10 @@ export const processIssues = (issues) => {
           hourCreated: createdDate.getHours(),
           updated: new Date(issue.updated_at).toISOString().split('T')[0],
           closedDateTime: closedDate,
+          created_at: issue.created_at,
+          closed_at: issue.closed_at,
           labels: safeGetLabels(issue.labels),
+          labelNames: Array.isArray(issue.labels) ? issue.labels.map((label) => label.name).filter(Boolean) : [],
           comments: issue.comments,
           url: issue.html_url,
           dayOfWeek: weekdayFormatter.format(createdDate),
@@ -87,8 +99,10 @@ export const processRepositories = (repos) => {
         stars: repo.stargazers_count,
         forks: repo.forks_count,
         watchers: repo.watchers_count,
+        private: repo.private,
         isPrivate: repo.private,
         isArchived: repo.archived,
+        fork: repo.fork,
         isFork: repo.fork,
         created: new Date(repo.created_at).toISOString().split('T')[0],
         updated: new Date(repo.updated_at).toISOString().split('T')[0],
@@ -200,6 +214,13 @@ export const generateAnalytics = ({ prs, issues, repos, contributions }) => {
   };
 };
 
+const normalizeContributions = (contributions) => ({
+  monthlyCommits:
+    contributions && typeof contributions === 'object' && !Array.isArray(contributions)
+      ? contributions.monthlyCommits || {}
+      : {},
+});
+
 const processTimeline = (items) => {
   const months = getLastNMonths(12);
   const timeline = Object.fromEntries(months.map(month => [month, 0]));
@@ -226,12 +247,12 @@ const processDayOfWeekActivity = (prs, issues) => {
 };
 
 const processPRStateStats = (prs) => {
-  const states = { Open: 0, Closed: 0, Merged: 0 };
+  const states = { open: 0, closed: 0, merged: 0 };
   prs.forEach(pr => {
     if (states[pr.state] !== undefined) states[pr.state]++;
   });
   return {
-    labels: Object.keys(states),
+    labels: ['Open', 'Closed', 'Merged'],
     data: Object.values(states),
     colors: ['#10b981', '#ef4444', '#8b5cf6']
   };
@@ -272,7 +293,8 @@ const processRepoTypeStats = (repos) => {
 
 const processMonthlyCommits = (contributions) => {
   const months = getLastNMonths(12);
-  const commits = months.map(month => contributions.monthlyCommits[month] || 0);
+  const normalized = normalizeContributions(contributions);
+  const commits = months.map((month) => normalized.monthlyCommits[month] || 0);
   return { labels: months, data: commits };
 };
 

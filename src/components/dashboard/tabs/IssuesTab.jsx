@@ -1,17 +1,19 @@
 // src/components/dashboard/tabs/IssuesTab.jsx
 import React, { useMemo } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { applyDashboardScopeFilters } from '../../../utils/dashboardFilters';
+import SafeExternalLink from '../../SafeExternalLink';
 
-const IssuesTab = ({ searchQuery, sortOption }) => {
+const IssuesTab = ({ searchQuery, sortOption, ownerScope, repoScope, timeRange }) => {
   const { issues } = useGithub();
   
   // Filter and sort issues based on search query and sort option
   const filteredAndSortedIssues = useMemo(() => {
     // Filter based on search query
-    let filtered = issues;
+    let filtered = applyDashboardScopeFilters([...issues], { ownerScope, repoScope, timeRange });
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = issues.filter(issue => 
+      filtered = filtered.filter(issue => 
         issue.title.toLowerCase().includes(query) || 
         issue.repository.toLowerCase().includes(query) ||
         (issue.labels && issue.labels.toLowerCase().includes(query))
@@ -19,7 +21,7 @@ const IssuesTab = ({ searchQuery, sortOption }) => {
     }
     
     // Sort based on sort option
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       switch(sortOption) {
         case 'oldest':
           return new Date(a.createdDateTime) - new Date(b.createdDateTime);
@@ -32,7 +34,7 @@ const IssuesTab = ({ searchQuery, sortOption }) => {
           return new Date(b.createdDateTime) - new Date(a.createdDateTime);
       }
     });
-  }, [issues, searchQuery, sortOption]);
+  }, [issues, ownerScope, repoScope, searchQuery, sortOption, timeRange]);
   
   // Display message if no results after filtering
   if (filteredAndSortedIssues.length === 0) {
@@ -62,14 +64,12 @@ const IssuesTab = ({ searchQuery, sortOption }) => {
           {filteredAndSortedIssues.map(issue => (
             <tr key={`${issue.repository}-${issue.number}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
               <td className="px-4 py-4 whitespace-nowrap">
-                <a 
-                  href={issue.url} 
-                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                <SafeExternalLink
+                  href={issue.url}
+                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                 >
                   #{issue.number}
-                </a>
+                </SafeExternalLink>
               </td>
               <td className="px-4 py-4 whitespace-nowrap">
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{issue.repository}</div>

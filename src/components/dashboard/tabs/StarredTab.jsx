@@ -1,16 +1,22 @@
 import React, { useMemo } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { applyDashboardScopeFilters } from '../../../utils/dashboardFilters';
+import SafeExternalLink from '../../SafeExternalLink';
 
-const StarredTab = ({ searchQuery, sortOption }) => {
+const StarredTab = ({ searchQuery, sortOption, ownerScope, repoScope, timeRange }) => {
   const { starredRepos } = useGithub();
   
   // Filter and sort starred repositories based on search query and sort option
   const filteredAndSortedStarred = useMemo(() => {
     // Filter based on search query
-    let filtered = starredRepos;
+    let filtered = applyDashboardScopeFilters([...starredRepos], {
+      ownerScope,
+      repoScope,
+      timeRange,
+    });
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = starredRepos.filter(repo => 
+      filtered = filtered.filter(repo => 
         repo.name.toLowerCase().includes(query) || 
         (repo.description && repo.description.toLowerCase().includes(query)) ||
         (repo.language && repo.language.toLowerCase().includes(query)) ||
@@ -19,7 +25,7 @@ const StarredTab = ({ searchQuery, sortOption }) => {
     }
     
     // Sort based on sort option
-    return filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       switch(sortOption) {
         case 'az':
           return a.name.localeCompare(b.name);
@@ -33,7 +39,7 @@ const StarredTab = ({ searchQuery, sortOption }) => {
           return b.stars - a.stars; // Default sort by stars for starred repos
       }
     });
-  }, [starredRepos, searchQuery, sortOption]);
+  }, [ownerScope, repoScope, searchQuery, sortOption, starredRepos, timeRange]);
   
   // Display message if no results after filtering
   if (filteredAndSortedStarred.length === 0) {
@@ -61,14 +67,12 @@ const StarredTab = ({ searchQuery, sortOption }) => {
           {filteredAndSortedStarred.map(repo => (
             <tr key={repo.name} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
               <td className="px-4 py-4 whitespace-nowrap">
-                <a 
-                  href={repo.url} 
-                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
+                <SafeExternalLink
+                  href={repo.url}
+                  className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                 >
                   {repo.name}
-                </a>
+                </SafeExternalLink>
               </td>
               <td className="px-4 py-4">
                 <div className="text-sm text-gray-900 dark:text-white">

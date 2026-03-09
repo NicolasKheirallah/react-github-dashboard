@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useGithub } from '../context/GithubContext';
-import { fetchAllGithubData } from '../services/githubService';
-import { processGithubData } from '../services/dataProcessingService';
+import { useTheme } from '../context/ThemeContext';
+import { useDashboardData } from '../hooks/useDashboardData';
+import {
+  DASHBOARD_PRESETS,
+  useDashboardPreferences,
+} from '../hooks/useDashboardPreferences';
+import { useScopedDashboardData } from '../hooks/useScopedDashboardData';
 import Loader from './Loader';
 import ErrorMessage from './ErrorMessage';
 import Overview from './dashboard/Overview';
 import ChartsSection from './dashboard/ChartsSection';
 import TabsSection from './dashboard/TabsSection';
-import CustomizableDashboard from './dashboard/CustomizableDashboard';
+import DashboardBriefing from './dashboard/DashboardBriefing';
 import ContributorsTab from './dashboard/tabs/ContributorsTab';
 import AnalyticsTab from './dashboard/tabs/AnalyticsTab';
-
-// Import individual chart components
 import PRReviewTimeChart from './dashboard/charts/PRReviewTimeChart';
 import IssueResolutionChart from './dashboard/charts/IssueResolutionChart';
 import CodeChurnChart from './dashboard/charts/CodeChurnChart';
@@ -22,9 +26,30 @@ import ActivityHeatmap from './dashboard/charts/ActivityHeatmap';
 import LanguageChart from './dashboard/charts/LanguageChart';
 
 const Dashboard = () => {
-  const { 
-    token, 
-    userData, 
+  const {
+    token,
+    userData,
+    setUserData,
+    setRepositories,
+    repositories,
+    setPullRequests,
+    setIssues,
+    setOrganizations,
+    setStarredRepos,
+    setContributions,
+    setAnalytics,
+    setUserEvents,
+    setFollowers,
+    setFollowing,
+    loading,
+    setLoading,
+    error,
+    setError,
+  } = useGithub();
+  const { darkMode } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dataLoaded = useDashboardData({
+    token,
     setUserData,
     setRepositories,
     setPullRequests,
@@ -34,175 +59,236 @@ const Dashboard = () => {
     setContributions,
     setAnalytics,
     setUserEvents,
-    loading,
+    setFollowers,
+    setFollowing,
     setLoading,
-    error,
     setError,
-    darkMode
-  } = useGithub();
-  
-  const [activeTab, setActiveTab] = useState('pull-requests');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortOption, setSortOption] = useState('newest');
-  const [dataLoaded, setDataLoaded] = useState(false);
-  
-  // Dashboard preferences
-  const [dashboardType, setDashboardType] = useState(() => {
-    const saved = localStorage.getItem('github-dashboard-type');
-    return saved || 'standard';
   });
-  
-  const [dashboardView, setDashboardView] = useState(() => {
-    const saved = localStorage.getItem('github-dashboard-view');
-    return saved || 'default';
-  });
-  
-  // Fetch data on component mount
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const data = await fetchAllGithubData(token);
-        
-        // Process the raw data
-        const {
-          userData,
-          processedPRs,
-          processedIssues,
-          processedRepos,
-          processedOrgs,
-          processedStarred,
-          processedContributions,
-          processedEvents,
-          analytics
-        } = processGithubData(data);
-        
-        // Update context with processed data
-        setUserData(userData);
-        setPullRequests(processedPRs);
-        setIssues(processedIssues);
-        setRepositories(processedRepos);
-        setOrganizations(processedOrgs);
-        setStarredRepos(processedStarred);
-        setContributions(processedContributions);
-        setUserEvents(processedEvents || data.userEvents); // Make sure userEvents is set
-        setAnalytics(analytics);
-        setDataLoaded(true);
-      } catch (err) {
-        console.error('Error loading GitHub data:', err);
-        setError('Failed to load GitHub data. Please check your connection and token validity.');
-      } finally {
-        setLoading(false);
+  const {
+    activeTab,
+    dashboardView,
+    changeDashboardView,
+    searchQuery,
+    setSearchQuery,
+    sortOption,
+    setSortOption,
+    ownerScope,
+    setOwnerScope,
+    repoScope,
+    setRepoScope,
+    timeRange,
+    setTimeRange,
+    handleTabChange,
+    activePreset,
+    applyDashboardPreset,
+    resetDashboardView,
+  } = useDashboardPreferences(searchParams, setSearchParams);
+  const scopedDashboardData = useScopedDashboardData({ ownerScope, repoScope, timeRange });
+  const ownerOptions = useMemo(() => {
+    const owners = new Set();
+
+    repositories.forEach((repo) => {
+      if (repo?.name?.includes('/')) {
+        owners.add(repo.name.split('/')[0]);
       }
-    };
-    
-    loadData();
-  // Added all the setter dependencies to satisfy ESLint
-  }, [token, setUserData, setPullRequests, setIssues, setRepositories, setOrganizations, setStarredRepos, setContributions, setUserEvents, setAnalytics, setError, setLoading]);
-  
-  // Toggle between dashboard types
-  const toggleDashboardType = () => {
-    const newType = dashboardType === 'standard' ? 'custom' : 'standard';
-    setDashboardType(newType);
-    localStorage.setItem('github-dashboard-type', newType);
-  };
-  
-  // Change dashboard view
-  const changeDashboardView = (view) => {
-    setDashboardView(view);
-    localStorage.setItem('github-dashboard-view', view);
-  };
-  
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    setSearchQuery('');
-  };
-  
-  const handleSearch = (event) => {
-    setSearchQuery(event.target.value);
-  };
-  
-  const handleSort = (event) => {
-    setSortOption(event.target.value);
-  };
-  
+    });
+
+    if (userData?.login) {
+      owners.add(userData.login);
+    }
+
+    return Array.from(owners).sort((left, right) => left.localeCompare(right));
+  }, [repositories, userData?.login]);
+  const repositoryOptions = useMemo(() => {
+    const scopedRepositoriesForOwner =
+      ownerScope === 'all'
+        ? repositories
+        : repositories.filter((repo) => repo.name.startsWith(`${ownerScope}/`));
+
+    return scopedRepositoriesForOwner.slice().sort((left, right) => left.name.localeCompare(right.name));
+  }, [ownerScope, repositories]);
+
+  useEffect(() => {
+    if (
+      repoScope !== 'all' &&
+      !repositoryOptions.some((repository) => repository.name === repoScope)
+    ) {
+      setRepoScope('all');
+    }
+  }, [repoScope, repositoryOptions, setRepoScope]);
+
   if (loading && !dataLoaded) {
     return <Loader message="Loading your GitHub data..." />;
   }
-  
+
   if (error) {
     return <ErrorMessage message={error} />;
   }
-  
+
   if (!userData) {
-    return <ErrorMessage message="Could not load user data" />;
+    return <ErrorMessage message="Could not load user data." />;
   }
-  
-  // Render view switcher
-  const renderViewSwitcher = () => (
-    <div className="mb-6 flex items-center justify-between">
-      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-        {userData?.name ? `${userData.name}'s Dashboard` : 'GitHub Dashboard'}
-      </h2>
-      
-      <div className="flex items-center space-x-4">
-        <div className="relative inline-block">
-          <select
-            value={dashboardView}
-            onChange={(e) => changeDashboardView(e.target.value)}
-            className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-md py-2 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="default">Standard View</option>
-            <option value="contributors">Contributors View</option>
-            <option value="analytics">Analytics View</option>
-            <option value="code">Code Metrics View</option>
-          </select>
+
+  const renderHeader = () => (
+    <>
+      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">
+            Standard Dashboard
+          </p>
+          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+            {userData?.name ? `${userData.name}'s GitHub Workspace` : 'GitHub Workspace'}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+            Review what needs attention, switch analytical lenses quickly, and jump into the
+            repo or workflow that deserves the next decision.
+          </p>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/50">
+            <p className="font-medium text-slate-800 dark:text-slate-200">Current focus</p>
+            <p className="mt-1 text-slate-600 dark:text-slate-300">
+              {dashboardView === 'default'
+                ? 'Overview, active work, and review/resolution signals'
+                : dashboardView === 'contributors'
+                  ? 'Collaboration hotspots and contributor activity'
+                  : dashboardView === 'analytics'
+                    ? 'Patterns, trends, and operational health'
+                    : 'Repository change volume and code metrics'}
+            </p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              {ownerScope === 'all' ? 'All owners' : ownerScope}
+              {' · '}
+              {repoScope === 'all' ? 'All repositories' : repoScope}
+              {' · '}
+              {timeRange === 'all'
+                ? 'All time'
+                : timeRange === '30d'
+                  ? 'Last 30 days'
+                  : timeRange === '90d'
+                    ? 'Last 90 days'
+                    : 'Last 180 days'}
+            </p>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {DASHBOARD_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => applyDashboardPreset(preset.id)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  activePreset === preset.id
+                    ? 'border-blue-500 bg-blue-600 text-white shadow-sm'
+                    : 'border-slate-300 bg-slate-50 text-slate-700 hover:border-blue-400 hover:text-blue-600 dark:border-slate-600 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:border-blue-500 dark:hover:text-blue-300'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={resetDashboardView}
+              className="rounded-full border border-dashed border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-slate-400 hover:text-slate-900 dark:border-slate-600 dark:text-slate-300 dark:hover:text-white"
+            >
+              Reset
+            </button>
+          </div>
         </div>
-        
-        <button
-          onClick={toggleDashboardType}
-          className={`flex items-center px-4 py-2 rounded-md text-sm transition-colors ${
-            dashboardType === 'custom'
-              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
-              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-          }`}
-          title={dashboardType === 'custom' ? "Switch to Standard Dashboard" : "Switch to Custom Dashboard"}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-          {dashboardType === 'custom' ? 'Custom Dashboard' : 'Standard Dashboard'}
-        </button>
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[34rem]">
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            Dashboard view
+            <select
+              value={dashboardView}
+              onChange={(event) => changeDashboardView(event.target.value)}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <option value="default">Standard View</option>
+              <option value="contributors">Contributors View</option>
+              <option value="analytics">Analytics View</option>
+              <option value="code">Code Metrics View</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            Owner scope
+            <select
+              value={ownerScope}
+              onChange={(event) => setOwnerScope(event.target.value)}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <option value="all">All owners</option>
+              {ownerOptions.map((owner) => (
+                <option key={owner} value={owner}>
+                  {owner}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            Repository scope
+            <select
+              value={repoScope}
+              onChange={(event) => setRepoScope(event.target.value)}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <option value="all">All repositories</option>
+              {repositoryOptions.slice(0, 40).map((repo) => (
+                <option key={repo.name} value={repo.name}>
+                  {repo.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
+            Activity window
+            <select
+              value={timeRange}
+              onChange={(event) => setTimeRange(event.target.value)}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+            >
+              <option value="all">All time</option>
+              <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="180d">Last 180 days</option>
+            </select>
+          </label>
+        </div>
       </div>
-    </div>
+      <DashboardBriefing
+        activeTab={activeTab}
+        onJumpToTab={handleTabChange}
+        ownerScope={ownerScope}
+        repoScope={repoScope}
+        timeRange={timeRange}
+        scopedData={scopedDashboardData}
+      />
+    </>
   );
-  
-  // Render dashboard based on selected type and view
+
   const renderDashboard = () => {
-    if (dashboardType === 'custom') {
-      return (
-        <>
-          {renderViewSwitcher()}
-          <CustomizableDashboard />
-        </>
-      );
-    }
-    
-    // Standard dashboard with different views
-    switch(dashboardView) {
+    switch (dashboardView) {
       case 'contributors':
         return (
           <>
-            {renderViewSwitcher()}
-            <Overview />
-            <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 rounded-t-lg">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Contributors Overview</h2>
+            {renderHeader()}
+            <Overview
+              scopedData={scopedDashboardData}
+              ownerScope={ownerScope}
+              repoScope={repoScope}
+              timeRange={timeRange}
+              onJumpToTab={handleTabChange}
+            />
+            <div className="mb-8 rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+              <div className="rounded-t-lg border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Contributors Overview
+                </h2>
               </div>
               <div className="p-4">
-                <ContributorsTab searchQuery={searchQuery} sortOption={sortOption === 'newest' ? 'most-active' : sortOption} />
+                <ContributorsTab
+                  searchQuery={searchQuery}
+                  sortOption={sortOption === 'newest' ? 'most-active' : sortOption}
+                  ownerScope={ownerScope}
+                  repoScope={repoScope}
+                />
               </div>
             </div>
             <div className="mb-8">
@@ -210,80 +296,118 @@ const Dashboard = () => {
             </div>
           </>
         );
-        
+
       case 'analytics':
         return (
           <>
-            {renderViewSwitcher()}
-            <Overview />
-            <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 rounded-t-lg">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Advanced Analytics</h2>
+            {renderHeader()}
+            <Overview
+              scopedData={scopedDashboardData}
+              ownerScope={ownerScope}
+              repoScope={repoScope}
+              timeRange={timeRange}
+              onJumpToTab={handleTabChange}
+            />
+            <div className="mb-8 rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+              <div className="rounded-t-lg border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Advanced Analytics
+                </h2>
               </div>
               <div className="p-4">
-                <AnalyticsTab />
+                <AnalyticsTab
+                  analytics={scopedDashboardData.analytics}
+                  pullRequests={scopedDashboardData.pullRequests}
+                  issues={scopedDashboardData.issues}
+                  repoScope={repoScope}
+                  timeRange={timeRange}
+                />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Pull Request Review Time</h3>
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+                <div className="border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Pull Request Review Time
+                  </h3>
                 </div>
                 <div className="p-4">
-                  <PRReviewTimeChart size="medium" />
+                  <PRReviewTimeChart
+                    size="medium"
+                    pullRequestsData={scopedDashboardData.pullRequests}
+                  />
                 </div>
               </div>
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Issue Resolution</h3>
+              <div className="rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+                <div className="border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Issue Resolution
+                  </h3>
                 </div>
                 <div className="p-4">
-                  <IssueResolutionChart size="medium" />
+                  <IssueResolutionChart
+                    size="medium"
+                    issuesData={scopedDashboardData.issues}
+                  />
                 </div>
               </div>
             </div>
           </>
         );
-        
+
       case 'code':
         return (
           <>
-            {renderViewSwitcher()}
-            <Overview />
-            <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 rounded-t-lg">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Code Metrics</h2>
+            {renderHeader()}
+            <Overview
+              scopedData={scopedDashboardData}
+              ownerScope={ownerScope}
+              repoScope={repoScope}
+              timeRange={timeRange}
+              onJumpToTab={handleTabChange}
+            />
+            <div className="mb-8 rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+              <div className="rounded-t-lg border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Code Metrics
+                </h2>
               </div>
-              <div className="p-4 space-y-8">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Code Churn Analysis</h3>
+              <div className="space-y-8 p-4">
+                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                  <div className="border-b border-gray-200 p-4 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Code Churn Analysis
+                    </h3>
                   </div>
                   <div className="p-4">
                     <CodeChurnChart size="medium" />
                   </div>
                 </div>
-                
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
-                  <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Commit Activity</h3>
+
+                <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                  <div className="border-b border-gray-200 p-4 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Commit Activity
+                    </h3>
                   </div>
                   <div className="p-4">
                     <CommitFrequencyChart size="large" />
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
-                    <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Language Distribution</h3>
+
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                    <div className="border-b border-gray-200 p-4 dark:border-gray-700">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Language Distribution
+                      </h3>
                     </div>
                     <div className="p-4">
                       <LanguageChart size="small" />
                     </div>
                   </div>
-                  
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-200 dark:border-gray-700">
+
+                  <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <div className="p-4">
                       <PRSizeDistributionChart size="large" />
                     </div>
@@ -293,64 +417,94 @@ const Dashboard = () => {
             </div>
           </>
         );
-        
-      default: // Default view
+
+      default:
         return (
           <>
-            {renderViewSwitcher()}
-            <Overview />
-            <ChartsSection />
-            <TabsSection 
+            {renderHeader()}
+            <Overview
+              scopedData={scopedDashboardData}
+              repoScope={repoScope}
+              timeRange={timeRange}
+              onJumpToTab={handleTabChange}
+            />
+            <ChartsSection
+              analytics={scopedDashboardData.analytics}
+              ownerScope={ownerScope}
+              repoScope={repoScope}
+              timeRange={timeRange}
+            />
+            <TabsSection
               activeTab={activeTab}
               onTabChange={handleTabChange}
               searchQuery={searchQuery}
-              onSearchChange={handleSearch}
+              onSearchChange={(event) => setSearchQuery(event.target.value)}
               sortOption={sortOption}
-              onSortChange={handleSort}
+              onSortChange={(event) => setSortOption(event.target.value)}
+              ownerScope={ownerScope}
+              ownerOptions={ownerOptions}
+              onOwnerScopeChange={(event) => setOwnerScope(event.target.value)}
+              repoScope={repoScope}
+              onRepoScopeChange={(event) => setRepoScope(event.target.value)}
+              timeRange={timeRange}
+              onTimeRangeChange={(event) => setTimeRange(event.target.value)}
+              scopedData={scopedDashboardData}
             />
-            
-            {/* Activity Heatmap Section */}
             <div className="mb-8">
               <ActivityHeatmap />
             </div>
-            
-            <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Issue Types</h3>
+            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+                <div className="border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Issue Types
+                  </h3>
                 </div>
                 <div className="p-4">
                   <IssueTypesChart size="medium" />
                 </div>
               </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Language Distribution</h3>
+
+              <div className="rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+                <div className="border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Language Distribution
+                  </h3>
                 </div>
                 <div className="p-4">
                   <LanguageChart size="medium" />
                 </div>
               </div>
             </div>
-            
-            {/* Review & Resolution Analytics Section */}
-            <div className="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 rounded-t-lg">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Review & Resolution Analytics</h2>
+
+            <div className="mb-8 rounded-lg border border-gray-200 bg-white shadow-md dark:border-gray-700 dark:bg-gray-800">
+              <div className="rounded-t-lg border-b border-gray-200 bg-gray-50 p-4 dark:border-gray-600 dark:bg-gray-700">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Review & Resolution Analytics
+                </h2>
               </div>
-              <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <PRReviewTimeChart size="small" />
-                <IssueResolutionChart size="small" />
+              <div className="grid grid-cols-1 gap-6 p-4 md:grid-cols-2">
+                <PRReviewTimeChart
+                  size="small"
+                  pullRequestsData={scopedDashboardData.pullRequests}
+                />
+                <IssueResolutionChart
+                  size="small"
+                  issuesData={scopedDashboardData.issues}
+                />
               </div>
             </div>
           </>
         );
     }
   };
-  
+
   return (
-    <div className={`container mx-auto px-4 py-8 max-w-7xl ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div
+      className={`container mx-auto max-w-7xl px-4 py-8 ${
+        darkMode ? 'bg-gray-900' : 'bg-slate-100'
+      }`}
+    >
       {renderDashboard()}
     </div>
   );

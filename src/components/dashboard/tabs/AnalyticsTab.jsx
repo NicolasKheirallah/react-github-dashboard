@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 import PRReviewTimeChart from '../charts/PRReviewTimeChart';
 import IssueResolutionChart from '../charts/IssueResolutionChart';
 import CodeChurnChart from '../charts/CodeChurnChart';
@@ -7,8 +8,29 @@ import CommitFrequencyChart from '../charts/CommitFrequencyChart';
 import PRSizeDistributionChart from '../charts/PRSizeDistributionChart';
 import IssueTypesChart from '../charts/IssueTypesChart';
 
-const AnalyticsTab = () => {
-  const { analytics, darkMode } = useGithub();
+const formatScopeLabel = (repoScope, timeRange) => {
+  const rangeLabel =
+    timeRange === '30d'
+      ? 'last 30 days'
+      : timeRange === '90d'
+        ? 'last 90 days'
+        : timeRange === '180d'
+          ? 'last 180 days'
+          : 'all time';
+
+  return repoScope === 'all' ? `${rangeLabel} across all repositories` : `${rangeLabel} for ${repoScope}`;
+};
+
+const AnalyticsTab = ({
+  analytics: scopedAnalytics,
+  pullRequests,
+  issues,
+  repoScope = 'all',
+  timeRange = 'all',
+}) => {
+  const { analytics: defaultAnalytics } = useGithub();
+  const { darkMode } = useTheme();
+  const analytics = scopedAnalytics || defaultAnalytics;
   const [activeSection, setActiveSection] = useState('pull-requests');
 
   const sections = [
@@ -32,7 +54,7 @@ const AnalyticsTab = () => {
                 </p>
               </div>
               <div className="p-4">
-                <PRReviewTimeChart size="medium" />
+                <PRReviewTimeChart size="medium" pullRequestsData={pullRequests} />
               </div>
             </div>
             
@@ -103,7 +125,7 @@ const AnalyticsTab = () => {
                 </p>
               </div>
               <div className="p-4">
-                <IssueResolutionChart size="medium" />
+                <IssueResolutionChart size="medium" issuesData={issues} />
               </div>
             </div>
             
@@ -262,6 +284,9 @@ const AnalyticsTab = () => {
 
   return (
     <div>
+      <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-slate-200">
+        Analytics scope: {formatScopeLabel(repoScope, timeRange)}
+      </div>
       {/* Section Tabs */}
       <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
         <ul className="flex flex-wrap -mb-px text-sm font-medium">

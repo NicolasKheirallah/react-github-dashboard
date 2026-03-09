@@ -1,107 +1,66 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 import Chart from 'chart.js/auto';
 
-const PRReviewTimeChart = ({ size = 'medium' }) => {
-  const { pullRequests, darkMode } = useGithub();
+const PRReviewTimeChart = ({ size = 'medium', pullRequestsData }) => {
+  const { pullRequests: contextPullRequests } = useGithub();
+  const { darkMode } = useTheme();
+  const pullRequests = pullRequestsData ?? contextPullRequests;
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
+  const prReviewData = useMemo(() => {
+    return (pullRequests || [])
+      .filter((pr) => pr.state === 'merged' && pr.created_at && pr.closed_at)
+      .map((pr) => {
+        const createdDate = new Date(pr.created_at);
+        const mergedDate = new Date(pr.closed_at);
+
+        return {
+          date: createdDate,
+          reviewTimeHours: (mergedDate - createdDate) / (1000 * 60 * 60),
+        };
+      })
+      .sort((a, b) => a.date - b.date);
+  }, [pullRequests]);
+
   useEffect(() => {
-    if (!chartRef.current) {
+    if (!chartRef.current || prReviewData.length === 0) {
       return;
     }
 
-    // Destroy existing chart if it exists
     if (chartInstance.current) {
       chartInstance.current.destroy();
     }
 
-    // Process pull requests or use sample data if none available
-    let prReviewData = [];
-    
-    if (pullRequests && Array.isArray(pullRequests) && pullRequests.length > 0) {
-      // Try to use real data first
-      const filteredPRs = pullRequests.filter(pr => pr.merged_at);
-      
-      if (filteredPRs.length > 0) {
-        prReviewData = filteredPRs.map(pr => {
-          const createdDate = new Date(pr.created_at);
-          const mergedDate = new Date(pr.merged_at);
-          const reviewTimeHours = (mergedDate - createdDate) / (1000 * 60 * 60);
-          return {
-            repo: pr.repository?.name || 'unknown',
-            number: pr.number,
-            title: pr.title,
-            reviewTimeHours,
-            date: createdDate
-          };
-        }).sort((a, b) => a.date - b.date);
-      } else {
-        // Generate sample data for visualization purposes
-        // This would be removed in production
-        const now = new Date();
-        for (let i = 0; i < 6; i++) {
-          const date = new Date();
-          date.setMonth(now.getMonth() - i);
-          prReviewData.push({
-            repo: 'sample-repo',
-            number: i,
-            title: 'Sample PR',
-            reviewTimeHours: Math.random() * 48 + 1, // 1-49 hours
-            date: date
-          });
-        }
-        prReviewData.reverse();
-      }
-    } else {
-      // Generate sample data for visualization purposes
-      // This would be removed in production
-      const now = new Date();
-      for (let i = 0; i < 6; i++) {
-        const date = new Date();
-        date.setMonth(now.getMonth() - i);
-        prReviewData.push({
-          repo: 'sample-repo',
-          number: i,
-          title: 'Sample PR',
-          reviewTimeHours: Math.random() * 48 + 1, // 1-49 hours
-          date: date
-        });
-      }
-      prReviewData.reverse();
-    }
-
-    // Group data by month
     const monthlyData = {};
-    prReviewData.forEach(pr => {
-      const month = pr.date.toISOString().substring(0, 7); // YYYY-MM format
-      if (!monthlyData[month]) {
-        monthlyData[month] = [];
-      }
+
+    prReviewData.forEach((pr) => {
+      const month = pr.date.toISOString().substring(0, 7);
+      monthlyData[month] = monthlyData[month] || [];
       monthlyData[month].push(pr.reviewTimeHours);
     });
 
-    // Calculate average review time per month
     const months = Object.keys(monthlyData).sort();
-    const averageReviewTimes = months.map(month => {
+    const averageReviewTimes = months.map((month) => {
       const times = monthlyData[month];
       return times.reduce((sum, time) => sum + time, 0) / times.length;
     });
 
-    // Format x-axis labels to be more readable
-    const formattedMonths = months.map(month => {
+    const formattedMonths = months.map((month) => {
       const [year, monthNum] = month.split('-');
-      const date = new Date(year, parseInt(monthNum) - 1, 1);
-      return date.toLocaleString('default', { month: 'short', year: 'numeric' });
+      return new Date(year, Number(monthNum) - 1, 1).toLocaleString('default', {
+        month: 'short',
+        year: 'numeric',
+      });
     });
 
-    // Chart theme
-    const isDarkMode = darkMode;
-    const textColor = isDarkMode ? '#c9d1d9' : '#24292f';
-    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const textColor = darkMode ? '#c9d1d9' : '#24292f';
+    const gridColor = darkMode
+      ? 'rgba(255, 255, 255, 0.1)'
+      : 'rgba(0, 0, 0, 0.1)';
 
-    // Create the chart
     const ctx = chartRef.current.getContext('2d');
     chartInstance.current = new Chart(ctx, {
       type: 'line',
@@ -117,9 +76,9 @@ const PRReviewTimeChart = ({ size = 'medium' }) => {
             tension: 0.3,
             pointBackgroundColor: '#2563eb',
             pointRadius: 4,
-            pointHoverRadius: 6
-          }
-        ]
+            pointHoverRadius: 6,
+          },
+        ],
       },
       options: {
         responsive: true,
@@ -130,72 +89,80 @@ const PRReviewTimeChart = ({ size = 'medium' }) => {
             title: {
               display: true,
               text: 'Hours',
-              color: textColor
+              color: textColor,
             },
             grid: {
-              color: gridColor
+              color: gridColor,
             },
             ticks: {
-              color: textColor
-            }
+              color: textColor,
+            },
           },
           x: {
             grid: {
-              color: gridColor
+              color: gridColor,
             },
             ticks: {
-              color: textColor
-            }
-          }
+              color: textColor,
+            },
+          },
         },
         plugins: {
           legend: {
             labels: {
-              color: textColor
-            }
+              color: textColor,
+            },
           },
           tooltip: {
             callbacks: {
-              label: function(context) {
-                const value = context.raw.toFixed(1);
+              label: function (context) {
+                const value = Number(context.raw || 0);
                 const hours = Math.floor(value);
                 const minutes = Math.round((value - hours) * 60);
                 return `Average: ${hours}h ${minutes}m`;
-              }
-            }
+              },
+            },
           },
           title: {
             display: true,
             text: 'Pull Request Review Time Trend',
             color: textColor,
             font: {
-              size: 16
-            }
-          }
-        }
-      }
+              size: 16,
+            },
+          },
+        },
+      },
     });
 
-    // Cleanup
     return () => {
       if (chartInstance.current) {
         chartInstance.current.destroy();
       }
     };
-  }, [pullRequests, darkMode]);
+  }, [darkMode, prReviewData]);
 
   const getChartHeight = () => {
     switch (size) {
-      case 'small': return 'h-48';
-      case 'large': return 'h-96';
+      case 'small':
+        return 'h-48';
+      case 'large':
+        return 'h-96';
       case 'medium':
-      default: return 'h-64';
+      default:
+        return 'h-64';
     }
   };
 
   return (
     <div className={`w-full ${getChartHeight()}`}>
-      <canvas ref={chartRef}></canvas>
+      {prReviewData.length > 0 ? (
+        <canvas ref={chartRef}></canvas>
+      ) : (
+        <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+          Review-time analytics require merged pull requests with created and closed timestamps.
+        </div>
+      )}
     </div>
   );
 };

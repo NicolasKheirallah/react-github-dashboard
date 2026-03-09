@@ -1,53 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useGithub } from '../context/GithubContext';
-import { fetchNotifications, markNotificationAsRead } from '../services/githubService';
+import {
+  fetchNotifications,
+  markNotificationAsRead,
+} from '../services/github/notifications';
+import SafeExternalLink from './SafeExternalLink';
+import { getSafeGithubWebUrl } from '../utils/externalLinks';
 
 const NotificationCenter = () => {
   const { token } = useGithub();
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
-
-  useEffect(() => {
-    const fetchUserNotifications = async () => {
-      if (!token) return;
-
-      try {
-        setLoading(true);
-        const data = await fetchNotifications(token);
-        setNotifications(data);
-      } catch (err) {
-        console.error('Error fetching notifications:', err);
-        setError('Failed to load notifications');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserNotifications();
-
-    // Poll for notifications every 60 seconds
-    const interval = setInterval(fetchUserNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [token]);
+  const queryClient = useQueryClient();
+  const notificationsQuery = useQuery({
+    queryKey: ['notifications', token],
+    enabled: Boolean(token),
+    refetchInterval: token ? 60_000 : false,
+    queryFn: ({ signal }) => fetchNotifications(token, { signal }),
+  });
+  const notifications = notificationsQuery.data || [];
+  const loading = notificationsQuery.isLoading;
+  const error = notificationsQuery.error?.message || null;
+  const markAsReadMutation = useMutation({
+    mutationFn: (notificationId) => markNotificationAsRead(token, notificationId),
+    onSuccess: (_, notificationId) => {
+      queryClient.setQueryData(['notifications', token], (currentNotifications = []) =>
+        currentNotifications.filter((notification) => notification.id !== notificationId)
+      );
+    },
+  });
 
   const handleMarkAsRead = async (id) => {
-    try {
-      await markNotificationAsRead(token, id);
-      setNotifications(notifications.filter((n) => n.id !== id));
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-    }
+    await markAsReadMutation.mutateAsync(id);
   };
 
   const handleMarkAllAsRead = async () => {
-    try {
-      await Promise.all(notifications.map((n) => markNotificationAsRead(token, n.id)));
-      setNotifications([]);
-    } catch (err) {
-      console.error('Error marking all notifications as read:', err);
-    }
+    await Promise.all(
+      notifications.map((notification) => markAsReadMutation.mutateAsync(notification.id))
+    );
   };
 
   const getNotificationIcon = (type) => {
@@ -99,17 +89,14 @@ const NotificationCenter = () => {
     }
   };
 
-  // Convert API URL to web URL
-  const getWebUrl = (apiUrl) => {
-    if (!apiUrl) return '#';
-    return apiUrl.replace('api.github.com/repos', 'github.com');
-  };
-
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        aria-label="Toggle notifications"
+        aria-expanded={isOpen}
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -122,7 +109,12 @@ const NotificationCenter = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 z-50">
+        <div
+          className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 z-50"
+          role="dialog"
+          aria-modal="false"
+          aria-label="Notifications"
+        >
           <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-750 rounded-t-lg">
             <h3 className="font-semibold text-gray-900 dark:text-white">Notifications</h3>
             {notifications.length > 0 && (
@@ -137,7 +129,7 @@ const NotificationCenter = () => {
 
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
-              <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+              <div className="p-4 text-center text-gray-500 dark:text-gray-400" role="status" aria-live="polite">
                 <svg className="animate-spin h-5 w-5 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -145,7 +137,7 @@ const NotificationCenter = () => {
                 <p className="mt-2">Loading notifications...</p>
               </div>
             ) : error ? (
-              <div className="p-4 text-center text-red-500 dark:text-red-400">
+              <div className="p-4 text-center text-red-500 dark:text-red-400" role="alert">
                 {error}
               </div>
             ) : notifications.length === 0 ? (
@@ -176,14 +168,12 @@ const NotificationCenter = () => {
                           {notification.subject.title}
                         </p>
                         <div className="mt-2 flex space-x-3">
-                          <a
-                            href={getWebUrl(notification.subject.url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <SafeExternalLink
+                            href={getSafeGithubWebUrl(notification.subject.url)}
                             className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
                           >
                             View
-                          </a>
+                          </SafeExternalLink>
                           <button
                             onClick={() => handleMarkAsRead(notification.id)}
                             className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"

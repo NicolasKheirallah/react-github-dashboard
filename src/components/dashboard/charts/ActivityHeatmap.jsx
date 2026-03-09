@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 import CalendarHeatmap from 'react-calendar-heatmap';
 import 'react-calendar-heatmap/dist/styles.css';
 import { Tooltip } from 'react-tooltip';
 import 'react-tooltip/dist/react-tooltip.css';
 
 const ActivityHeatmap = () => {
-  const { userEvents, darkMode } = useGithub();
+  const { userEvents } = useGithub();
+  const { darkMode } = useTheme();
   const [contributionData, setContributionData] = useState([]);
   const [yearlyTotal, setYearlyTotal] = useState(0);
   const heatmapRef = useRef(null);
@@ -66,30 +68,6 @@ const ActivityHeatmap = () => {
             }
           }
         });
-      } else {
-        // Generate sample data
-        for (const dateStr in contributions) {
-          const date = new Date(dateStr);
-          const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
-          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          
-          // Generate more realistic patterns
-          const randomFactor = Math.random();
-          let count = 0;
-          
-          // Less activity on weekends
-          if (randomFactor > (isWeekend ? 0.85 : 0.6)) {
-            count = Math.floor(randomFactor * 5) * (isWeekend ? 0.5 : 1);
-            
-            // Occasional high activity days
-            if (randomFactor > 0.95) {
-              count += Math.floor(Math.random() * 10);
-            }
-          }
-          
-          contributions[dateStr] = count;
-          total += count;
-        }
       }
 
       // Convert to format expected by the heatmap
@@ -247,6 +225,12 @@ const ActivityHeatmap = () => {
         </div>
       </div>
 
+      {yearlyTotal === 0 && (
+        <div className="mb-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-gray-600 dark:bg-gray-900/30 dark:text-gray-300">
+          No contribution events were returned for the selected range yet. This chart now shows only real GitHub activity.
+        </div>
+      )}
+
       <div className="relative overflow-hidden border rounded-lg border-gray-200 dark:border-gray-700 p-2">
         <div data-tooltip-id="heatmap-tooltip">
           <CalendarHeatmap
@@ -305,7 +289,7 @@ const ActivityHeatmap = () => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .color-empty {
           fill: var(--color-canvas-subtle, #ebedf0);
         }

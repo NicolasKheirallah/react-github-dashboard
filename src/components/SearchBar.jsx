@@ -1,29 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import UnifiedSearch from './UnifiedSearch';
+import {
+  readJsonStorage,
+  removeStorageValue,
+  writeJsonStorage,
+} from '../utils/storage';
 
-const SearchBar = ({ onSearch }) => {
-  const [query, setQuery] = useState('');
-  const [searchHistory, setSearchHistory] = useState([]);
+const SearchBar = ({
+  onSearch,
+  value,
+  onQueryChange,
+  placeholder = 'Search repositories, PRs, issues...',
+  inputId = 'workspace-search',
+}) => {
+  const [internalQuery, setInternalQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [recentSearches, setRecentSearches] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const query = typeof value === 'string' ? value : internalQuery;
 
-  // Load recent searches from localStorage on component mount
-  useEffect(() => {
-    try {
-      const savedSearches = localStorage.getItem('github-recent-searches');
-      if (savedSearches) {
-        setRecentSearches(JSON.parse(savedSearches));
-      }
-    } catch (error) {
-      console.error('Error loading recent searches:', error);
+  const updateQuery = (nextValue) => {
+    if (typeof onQueryChange === 'function') {
+      onQueryChange(nextValue);
+      return;
     }
+
+    setInternalQuery(nextValue);
+  };
+
+  // Load recent searches from session storage on component mount
+  useEffect(() => {
+    setRecentSearches(readJsonStorage('github-recent-searches', [], 'session'));
   }, []);
 
-  // Update localStorage when recent searches change
+  // Update session storage when recent searches change
   useEffect(() => {
     if (recentSearches.length > 0) {
-      localStorage.setItem('github-recent-searches', JSON.stringify(recentSearches));
+      writeJsonStorage('github-recent-searches', recentSearches, 'session');
     }
   }, [recentSearches]);
 
@@ -70,38 +83,36 @@ const SearchBar = ({ onSearch }) => {
   }, [query, recentSearches]);
 
   // Handle search submission
-  const handleSearch = (e) => {
-    e && e.preventDefault();
-    
-    if (!query.trim()) return;
-    
-    // Add to recent searches if not already present
-    if (!recentSearches.includes(query)) {
-      const updatedSearches = [query, ...recentSearches].slice(0, 10);
+  const handleSearch = (eventOrQuery) => {
+    const nextQuery = typeof eventOrQuery === 'string' ? eventOrQuery : query;
+
+    if (typeof eventOrQuery !== 'string') {
+      eventOrQuery && eventOrQuery.preventDefault();
+    }
+
+    if (!nextQuery.trim()) return;
+
+    if (!recentSearches.includes(nextQuery)) {
+      const updatedSearches = [nextQuery, ...recentSearches].slice(0, 10);
       setRecentSearches(updatedSearches);
     }
-    
-    // Add to search history for the current session
-    setSearchHistory([query, ...searchHistory].slice(0, 20));
-    
-    // Call the parent's search handler
+
     if (onSearch) {
-      onSearch(query);
+      onSearch(nextQuery);
     }
-    
-    // Hide suggestions
+
     setShowSuggestions(false);
   };
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion) => {
-    setQuery(suggestion.value);
+    updateQuery(suggestion.value);
     
     // If it's a filter suggestion, apply it directly
     if (suggestion.type !== 'recent') {
       // Small delay to update the input field before submitting
       setTimeout(() => {
-        handleSearch();
+        handleSearch(suggestion.value);
       }, 10);
     }
     
@@ -111,7 +122,7 @@ const SearchBar = ({ onSearch }) => {
   // Clear search history
   const clearSearchHistory = () => {
     setRecentSearches([]);
-    localStorage.removeItem('github-recent-searches');
+    removeStorageValue('github-recent-searches', 'session');
   };
 
   return (
@@ -121,10 +132,11 @@ const SearchBar = ({ onSearch }) => {
           <div className="relative flex-grow">
             <input
               type="text"
+              id={inputId}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              placeholder="Search repositories, PRs, issues..."
+              placeholder={placeholder}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => updateQuery(e.target.value)}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => {
                 // Delay hiding the suggestions to allow for clicks
@@ -140,7 +152,8 @@ const SearchBar = ({ onSearch }) => {
               <button
                 type="button"
                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                onClick={() => setQuery('')}
+                onClick={() => updateQuery('')}
+                aria-label="Clear search query"
               >
                 <svg className="h-5 w-5 text-gray-400 hover:text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -182,8 +195,8 @@ const SearchBar = ({ onSearch }) => {
                     <button
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       onClick={() => {
-                        setQuery(search);
-                        handleSearch();
+                        updateQuery(search);
+                        handleSearch(search);
                       }}
                     >
                       <div className="flex items-center">

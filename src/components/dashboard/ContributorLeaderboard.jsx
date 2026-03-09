@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Chart from 'chart.js/auto';
+import SafeExternalLink from '../SafeExternalLink';
 
 const ContributorLeaderboard = ({ contributorStats, darkMode }) => {
   const [sortBy, setSortBy] = useState('commits');
@@ -7,7 +8,7 @@ const ContributorLeaderboard = ({ contributorStats, darkMode }) => {
   const chartInstance = useRef(null);
   
   // Process contributor data for display and sorting
-  const processContributors = () => {
+  const processContributors = useCallback(() => {
     if (!contributorStats || !Array.isArray(contributorStats)) {
       return [];
     }
@@ -30,7 +31,7 @@ const ContributorLeaderboard = ({ contributorStats, darkMode }) => {
         codeDelta: totalCodeDelta
       };
     }).sort((a, b) => b[sortBy] - a[sortBy]);
-  };
+  }, [contributorStats, sortBy]);
   
   // Create visualization chart
   useEffect(() => {
@@ -162,10 +163,10 @@ const ContributorLeaderboard = ({ contributorStats, darkMode }) => {
         chartInstance.current.destroy();
       }
     };
-  }, [contributorStats, sortBy, darkMode]);
+  }, [contributorStats, sortBy, darkMode, processContributors]);
   
   // For the table display
-  const contributors = processContributors();
+  const contributors = useMemo(() => processContributors(), [processContributors]);
   
   return (
     <div className="space-y-6">
@@ -255,14 +256,12 @@ const ContributorLeaderboard = ({ contributorStats, darkMode }) => {
                         <img className="h-8 w-8 rounded-full" src={contributor.avatar || 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'} alt={contributor.login} />
                       </div>
                       <div className="ml-4">
-                        <a 
-                          href={contributor.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
+                        <SafeExternalLink
+                          href={contributor.url}
                           className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
                         >
                           {contributor.login}
-                        </a>
+                        </SafeExternalLink>
                       </div>
                     </div>
                   </td>

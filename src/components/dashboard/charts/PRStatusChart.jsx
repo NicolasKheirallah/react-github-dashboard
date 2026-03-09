@@ -1,10 +1,12 @@
 // src/components/dashboard/charts/PRStatusChart.jsx
 import React, { useEffect, useRef } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 import Chart from 'chart.js/auto';
 
-const PRStatusChart = ({ size }) => {
-  const { pullRequests, darkMode } = useGithub();
+const PRStatusChart = () => {
+  const { pullRequests } = useGithub();
+  const { darkMode } = useTheme();
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   

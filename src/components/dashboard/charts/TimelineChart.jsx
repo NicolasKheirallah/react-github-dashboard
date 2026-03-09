@@ -1,10 +1,12 @@
 // src/components/dashboard/charts/TimelineChart.jsx
 import React, { useEffect, useRef } from 'react';
 import { useGithub } from '../../../context/GithubContext';
+import { useTheme } from '../../../context/ThemeContext';
 import Chart from 'chart.js/auto';
 
-const TimelineChart = ({ size }) => {
-  const { pullRequests, userEvents, darkMode } = useGithub();
+const TimelineChart = () => {
+  const { pullRequests, userEvents } = useGithub();
+  const { darkMode } = useTheme();
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getSafeExternalUrl } from '../../utils/externalLinks';
 
 const SecurityAlerts = ({ vulnerabilities }) => {
   const [filter, setFilter] = useState('all');
@@ -19,7 +20,10 @@ const SecurityAlerts = ({ vulnerabilities }) => {
         : 'Unknown date';
       
       return {
-        id: alert.id || Math.random().toString(),
+        id:
+          alert.id ||
+          alert.number ||
+          `${packageName}-${severity}-${publishedAt}`.toLowerCase().replace(/\s+/g, '-'),
         title: alert.security_advisory?.summary || 'Unknown vulnerability',
         severity,
         severityLevel: getSeverityLevel(severity),
@@ -28,7 +32,9 @@ const SecurityAlerts = ({ vulnerabilities }) => {
         currentVersion,
         publishedAt,
         description: alert.security_advisory?.description || 'No description available',
-        url: alert.security_advisory?.references?.[0]?.url || '#'
+        url:
+          getSafeExternalUrl(alert.security_advisory?.references?.[0]?.url) ||
+          'https://github.com/advisories'
       };
     });
     
@@ -123,7 +129,7 @@ const SecurityAlerts = ({ vulnerabilities }) => {
           No Security Vulnerabilities Found
         </h3>
         <p className="text-gray-500 dark:text-gray-400">
-          This repository doesn't have any known security vulnerabilities.
+          This repository doesn&apos;t have any known security vulnerabilities.
         </p>
       </div>
     );

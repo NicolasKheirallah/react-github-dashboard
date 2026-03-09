@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useGithub } from '../../../context/GithubContext';
-import { fetchAllContributorData } from '../../../services/githubService';
+import { fetchAllContributorData } from '../../../services/github/contributors';
+import SafeExternalLink from '../../SafeExternalLink';
 
-const ContributorsTab = ({ searchQuery, sortOption }) => {
+const ContributorsTab = ({ searchQuery, sortOption, ownerScope = 'all', repoScope = 'all' }) => {
   const { repositories, pullRequests, token } = useGithub();
   const [contributors, setContributors] = useState([]);
   const [filteredContributors, setFilteredContributors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Fetch contributors using the integrated GitHub service
   useEffect(() => {
@@ -16,71 +18,47 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
       setError(null);
       
       try {
-        // Log what data we're working with
-        console.log(`Fetching contributors data with ${repositories?.length || 0} repositories and ${pullRequests?.length || 0} pull requests`);
-        
         if (!token) {
           throw new Error('GitHub token not available');
         }
         
-        // Fetch contributors directly from GitHub API
-        const contributorsData = await fetchAllContributorData(token, repositories, pullRequests);
-        
-        console.log(`Fetched ${contributorsData.length} contributors from GitHub API`);
+        const scopedRepositories =
+          ownerScope === 'all'
+            ? repositories
+            : repositories.filter((repo) => repo.name.startsWith(`${ownerScope}/`));
+        const scopedPullRequests =
+          ownerScope === 'all'
+            ? pullRequests
+            : pullRequests.filter((pullRequest) =>
+                pullRequest.repository.startsWith(`${ownerScope}/`)
+              );
+
+        const repositoriesToFetch =
+          repoScope === 'all'
+            ? scopedRepositories
+            : scopedRepositories.filter((repo) => repo.name === repoScope);
+        const pullRequestsToFetch =
+          repoScope === 'all'
+            ? scopedPullRequests
+            : scopedPullRequests.filter((pullRequest) => pullRequest.repository === repoScope);
+
+        const contributorsData = await fetchAllContributorData(
+          token,
+          repositoriesToFetch,
+          pullRequestsToFetch
+        );
         setContributors(contributorsData);
       } catch (err) {
         console.error('Error fetching contributors:', err);
         setError(err.message || 'Failed to load contributors');
-        
-        // In development mode, use dummy data
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Using dummy data for development');
-          setContributors([
-            {
-              id: 'dev1',
-              login: 'developer1',
-              name: 'Developer One',
-              avatar_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
-              html_url: 'https://github.com/developer1',
-              contributions: 35,
-              pullRequests: 12,
-              repositories: ['repo1', 'repo2', 'repo3'],
-              repoCount: 3,
-              totalActivity: 47
-            },
-            {
-              id: 'dev2',
-              login: 'developer2',
-              name: 'Developer Two',
-              avatar_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
-              html_url: 'https://github.com/developer2',
-              contributions: 28,
-              pullRequests: 5,
-              repositories: ['repo1', 'repo4'],
-              repoCount: 2,
-              totalActivity: 33
-            },
-            {
-              id: 'dev3',
-              login: 'developer3',
-              name: 'Developer Three',
-              avatar_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
-              html_url: 'https://github.com/developer3',
-              contributions: 42,
-              pullRequests: 9,
-              repositories: ['repo2', 'repo3', 'repo5', 'repo6'],
-              repoCount: 4,
-              totalActivity: 51
-            }
-          ]);
-        }
+        setContributors([]);
       } finally {
         setLoading(false);
       }
     };
     
     getContributors();
-  }, [repositories, pullRequests, token]);
+  }, [ownerScope, pullRequests, repoScope, repositories, reloadKey, token]);
 
   // Filter and sort contributors based on search query and sort option
   useEffect(() => {
@@ -90,10 +68,19 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
     }
 
     // Filter by search query
-    let filtered = contributors;
+    let filtered = [...contributors];
+
+    if (repoScope !== 'all') {
+      filtered = filtered.filter(
+        (contributor) =>
+          Array.isArray(contributor.repositories) &&
+          contributor.repositories.some((repository) => repository === repoScope)
+      );
+    }
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = contributors.filter(contributor => {
+      filtered = filtered.filter(contributor => {
         // Handle potential undefined values with safe property access
         const loginMatch = contributor.login && 
           contributor.login.toLowerCase().includes(query);
@@ -133,8 +120,7 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
     }
 
     setFilteredContributors(filtered);
-    console.log(`Filtered to ${filtered.length} contributors`);
-  }, [contributors, searchQuery, sortOption]);
+  }, [contributors, repoScope, searchQuery, sortOption]);
 
   if (loading) {
     return (
@@ -152,7 +138,7 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
         <div className="text-sm">{error}</div>
         <button 
           className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-          onClick={() => window.location.reload()}
+          onClick={() => setReloadKey((currentValue) => currentValue + 1)}
         >
           Retry
         </button>
@@ -166,14 +152,16 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
         <div className="mb-4">
           {searchQuery 
             ? `No contributors found matching "${searchQuery}"`
-            : "No contributors data available"
+            : repoScope !== 'all'
+              ? `No contributors found for ${repoScope}`
+              : "No contributors data available"
           }
         </div>
         <div className="text-sm max-w-lg mx-auto">
           <p>This could be due to:</p>
           <ul className="list-disc pl-5 text-left mt-2">
             <li>Limited access to contributor data with your current GitHub token</li>
-            <li>The repositories analyzed don't have multiple contributors</li>
+            <li>The repositories analyzed don&apos;t have multiple contributors</li>
             <li>GitHub API rate limiting prevented fetching all contributor data</li>
           </ul>
           <p className="mt-2">Try refreshing the page or analyzing different repositories.</p>
@@ -207,14 +195,12 @@ const ContributorsTab = ({ searchQuery, sortOption }) => {
                 <h3 className="text-md font-semibold text-gray-900 dark:text-white truncate">
                   {contributor.name || contributor.login || 'Unknown User'}
                 </h3>
-                <a
-                  href={contributor.html_url || '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <SafeExternalLink
+                  href={contributor.html_url}
                   className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
                 >
                   @{contributor.login || 'unknown'}
-                </a>
+                </SafeExternalLink>
               </div>
               
               <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
