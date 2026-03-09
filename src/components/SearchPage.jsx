@@ -85,8 +85,8 @@ const SearchPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-6xl">
-      <div className="mb-6">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">
             Search Workspace

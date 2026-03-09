@@ -131,19 +131,19 @@ const Dashboard = () => {
 
   const renderHeader = () => (
     <>
-      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+      <div className="mb-8 grid gap-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800 xl:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.95fr)]">
+        <div className="space-y-4">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">
             Standard Dashboard
           </p>
-          <h1 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white sm:text-4xl">
             {userData?.name ? `${userData.name}'s GitHub Workspace` : 'GitHub Workspace'}
           </h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+          <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             Review what needs attention, switch analytical lenses quickly, and jump into the
             repo or workflow that deserves the next decision.
           </p>
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900/50">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm dark:border-slate-700 dark:bg-slate-900/50">
             <p className="font-medium text-slate-800 dark:text-slate-200">Current focus</p>
             <p className="mt-1 text-slate-600 dark:text-slate-300">
               {dashboardView === 'default'
@@ -165,10 +165,10 @@ const Dashboard = () => {
                   ? 'Last 30 days'
                   : timeRange === '90d'
                     ? 'Last 90 days'
-                    : 'Last 180 days'}
+                : 'Last 180 days'}
             </p>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             {DASHBOARD_PRESETS.map((preset) => (
               <button
                 key={preset.id}
@@ -193,7 +193,13 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[34rem]">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
+          <div className="mb-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              Refine dashboard
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
             Dashboard view
             <select
@@ -250,6 +256,7 @@ const Dashboard = () => {
               <option value="180d">Last 180 days</option>
             </select>
           </label>
+          </div>
         </div>
       </div>
       <DashboardBriefing
@@ -500,11 +507,7 @@ const Dashboard = () => {
   };
 
   return (
-    <div
-      className={`container mx-auto max-w-7xl px-4 py-8 ${
-        darkMode ? 'bg-gray-900' : 'bg-slate-100'
-      }`}
-    >
+    <div className={darkMode ? 'space-y-8' : 'space-y-8'}>
       {renderDashboard()}
     </div>
   );
